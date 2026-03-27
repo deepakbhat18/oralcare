@@ -1,0 +1,87 @@
+package com.dental.clinic.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "bills")
+@EntityListeners(AuditingEntityListener.class)
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Bill {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "treatment_id")
+    private TreatmentPlan treatment;
+
+    @Column(nullable = false)
+    private Double amount;
+
+    @Column(name = "discount")
+    @Builder.Default
+    private Double discount = 0.0;
+
+    @Column(name = "tax")
+    @Builder.Default
+    private Double tax = 0.0;
+
+    @Column(name = "total_amount")
+    private Double totalAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private BillStatus status = BillStatus.UNPAID;
+
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Column(name = "invoice_number", unique = true)
+    private String invoiceNumber;
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public enum BillStatus {
+        UNPAID, PAID, PARTIALLY_PAID, OVERDUE, CANCELLED, REFUNDED
+    }
+
+    @PrePersist
+    @PreUpdate
+    public void calculateTotal() {
+        if (amount != null) {
+            double disc = discount != null ? discount : 0.0;
+            double taxAmt = tax != null ? tax : 0.0;
+            this.totalAmount = (amount - disc) + taxAmt;
+        }
+    }
+}
