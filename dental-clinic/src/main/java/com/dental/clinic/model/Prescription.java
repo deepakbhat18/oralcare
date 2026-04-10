@@ -32,7 +32,6 @@ public class Prescription {
     @JoinColumn(name = "prescribed_by")
     private User prescribedBy;
 
-    // JSON list of medicines: [{"name":"Amoxicillin","dosage":"500mg","frequency":"3x daily"}]
     @Column(name = "medicine_list", columnDefinition = "TEXT", nullable = false)
     private String medicineList;
 

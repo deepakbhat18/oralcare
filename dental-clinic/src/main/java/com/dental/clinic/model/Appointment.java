@@ -5,20 +5,20 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "appointments")
+@Table(name = "appointments", indexes = {
+        @Index(name = "idx_apt_patient",  columnList = "patient_id"),
+        @Index(name = "idx_apt_dentist",  columnList = "dentist_id"),
+        @Index(name = "idx_apt_datetime", columnList = "date_time"),
+        @Index(name = "idx_apt_booking",  columnList = "booking_time")
+})
 @EntityListeners(AuditingEntityListener.class)
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class Appointment {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -49,13 +49,20 @@ public class Appointment {
     @Column(name = "room_number")
     private String roomNumber;
 
-    // AI predicted queue time (minutes)
     @Column(name = "predicted_queue_time")
     private Double predictedQueueTime;
 
-    // AI predicted treatment duration (minutes)
     @Column(name = "predicted_treatment_duration")
     private Double predictedTreatmentDuration;
+
+    @Column(name = "booking_time")
+    private LocalDateTime bookingTime;
+
+    @Column(name = "queue_position")
+    private Integer queuePosition;
+
+    @Column(name = "estimated_wait_minutes")
+    private Integer estimatedWaitMinutes;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "clinic_id")
@@ -70,6 +77,7 @@ public class Appointment {
     private LocalDateTime updatedAt;
 
     public enum AppointmentStatus {
-        SCHEDULED, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, RESCHEDULED
+        SCHEDULED, CONFIRMED, WAITING, IN_PROGRESS, COMPLETED,
+        CANCELLED, NO_SHOW, RESCHEDULED
     }
 }
