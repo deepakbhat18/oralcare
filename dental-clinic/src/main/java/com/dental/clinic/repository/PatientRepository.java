@@ -13,3 +13,8 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     List<Patient> findByNameContainingIgnoreCase(String name);
 
 }
+
+/*
+ * This file contains the PatientRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

@@ -31,17 +31,35 @@ public class TreatmentPlan {
     @JoinColumn(name = "dentist_id", nullable = false)
     private User dentist;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id")
+    private Clinic clinic;
+
     @Column(name = "plan_name", nullable = false)
     private String planName;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @ElementCollection
-    @CollectionTable(name = "treatment_sessions", joinColumns = @JoinColumn(name = "plan_id"))
-    @Column(name = "session")
-    @Builder.Default
-    private List<String> sessions = new ArrayList<>();
+
+
+
+
+
+@ElementCollection
+@CollectionTable(name = "treatment_sessions", joinColumns = @JoinColumn(name = "plan_id"))
+@Builder.Default
+private List<SessionRecord> sessions = new ArrayList<>();
+@Embeddable
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public static class SessionRecord {
+    private String title;
+    private Boolean completed;
+    private LocalDateTime completedAt;
+    private String completedByName;
+}
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -76,3 +94,8 @@ public class TreatmentPlan {
         PENDING, IN_PROGRESS, COMPLETED, CANCELLED, ON_HOLD
     }
 }
+
+/*
+ * This file contains the TreatmentPlan class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

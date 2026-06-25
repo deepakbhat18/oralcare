@@ -20,3 +20,8 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
     @Query("DELETE FROM OtpVerification o WHERE o.email = :email AND o.otpType = :otpType")
     void deleteAllByEmailAndOtpType(String email, OtpVerification.OtpType otpType);
 }
+
+/*
+ * This file contains the OtpVerificationRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

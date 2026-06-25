@@ -16,3 +16,8 @@ public class DentalClinicApplication {
         SpringApplication.run(DentalClinicApplication.class, args);
     }
 }
+
+/*
+ * This file contains the DentalClinicApplication class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

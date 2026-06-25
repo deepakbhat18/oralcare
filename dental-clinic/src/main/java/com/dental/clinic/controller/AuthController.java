@@ -21,8 +21,12 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request)));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            jakarta.servlet.http.HttpServletRequest httpServletRequest) {
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceDetails = httpServletRequest.getHeader("User-Agent");
+        return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request, ipAddress, deviceDetails)));
     }
 
     @PostMapping("/register")
@@ -63,8 +67,19 @@ public class AuthController {
 
     @PostMapping("/refresh-token")
     @Operation(summary = "Refresh access token")
-    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestParam String refreshToken) {
-        return ResponseEntity.ok(ApiResponse.success("Token refreshed", authService.refreshToken(refreshToken)));
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
+            @Valid @RequestBody TokenRefreshRequest request,
+            jakarta.servlet.http.HttpServletRequest httpServletRequest) {
+        String ipAddress = httpServletRequest.getRemoteAddr();
+        String deviceDetails = httpServletRequest.getHeader("User-Agent");
+        return ResponseEntity.ok(ApiResponse.success("Token refreshed", authService.refreshToken(request.getRefreshToken(), ipAddress, deviceDetails)));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout user and invalidate refresh tokens")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestParam Long userId) {
+        authService.logout(userId);
+        return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }
 
     @RequestMapping(value = "/**", method = RequestMethod.OPTIONS)
@@ -72,3 +87,8 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 }
+
+/*
+ * This file contains the AuthController class which manages HTTP request routing, mapping endpoints, and returning REST API responses.
+ * Concepts used: Spring REST controllers, request mapping annotations, and client-server data exchange.
+ */

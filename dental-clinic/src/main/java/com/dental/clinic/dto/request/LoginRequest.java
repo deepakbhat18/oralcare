@@ -14,3 +14,8 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     private String password;
 }
+
+/*
+ * This file contains the LoginRequest class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

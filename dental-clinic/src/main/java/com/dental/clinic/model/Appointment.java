@@ -1,7 +1,8 @@
 package com.dental.clinic.model;
-
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -14,6 +15,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_apt_datetime", columnList = "date_time"),
         @Index(name = "idx_apt_booking",  columnList = "booking_time")
 })
+@SQLDelete(sql = "UPDATE appointments SET deleted = true WHERE id = ?")
+@Where(clause = "deleted = false")
 @EntityListeners(AuditingEntityListener.class)
 @Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class Appointment {
@@ -49,12 +52,6 @@ public class Appointment {
     @Column(name = "room_number")
     private String roomNumber;
 
-    @Column(name = "predicted_queue_time")
-    private Double predictedQueueTime;
-
-    @Column(name = "predicted_treatment_duration")
-    private Double predictedTreatmentDuration;
-
     @Column(name = "booking_time")
     private LocalDateTime bookingTime;
 
@@ -67,6 +64,22 @@ public class Appointment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "clinic_id")
     private Clinic clinic;
+
+    @Builder.Default
+    @Column(name = "reminder_sent", nullable = false)
+    private boolean reminderSent = false;
+
+    @Builder.Default
+    @Column(name = "reminder_24h_sent", nullable = false)
+    private boolean reminder24hSent = false;
+
+    @Builder.Default
+    @Column(name = "reminder_1h_sent", nullable = false)
+    private boolean reminder1hSent = false;
+
+    @Builder.Default
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -81,3 +94,8 @@ public class Appointment {
         CANCELLED, NO_SHOW, RESCHEDULED
     }
 }
+
+/*
+ * This file contains the Appointment class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

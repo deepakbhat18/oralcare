@@ -14,3 +14,8 @@ public class RegisterRequest {
     private String phoneNumber;
     private Long clinicId;
 }
+
+/*
+ * This file contains the RegisterRequest class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

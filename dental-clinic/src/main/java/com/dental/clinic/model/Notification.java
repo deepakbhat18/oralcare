@@ -8,7 +8,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", indexes = {
+        @Index(name = "idx_notif_user_read", columnList = "user_id, is_read")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
@@ -53,3 +55,8 @@ public class Notification {
         APPOINTMENT, REMINDER, BILL, PRESCRIPTION, REPORT, SYSTEM, INFO, ALERT
     }
 }
+
+/*
+ * This file contains the Notification class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

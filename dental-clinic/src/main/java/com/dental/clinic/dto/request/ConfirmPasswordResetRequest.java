@@ -9,3 +9,8 @@ public class ConfirmPasswordResetRequest {
     @NotBlank @Size(min=8)
     private String newPassword;
 }
+
+/*
+ * This file contains the ConfirmPasswordResetRequest class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

@@ -60,3 +60,8 @@ public class PasswordResetToken {
         EMAIL_LINK, OTP_EMAIL, OTP_SMS
     }
 }
+
+/*
+ * This file contains the PasswordResetToken class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

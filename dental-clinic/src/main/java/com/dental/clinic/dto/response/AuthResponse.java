@@ -8,3 +8,8 @@ public class AuthResponse {
     private Long expiresIn;
     private UserResponse user;
 }
+
+/*
+ * This file contains the AuthResponse class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

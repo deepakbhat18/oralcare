@@ -195,3 +195,8 @@ public class EmailService {
         }
     }
 }
+
+/*
+ * This file contains the EmailService class which manages abstract contracts for clinical operations and decoupling controllers from repository databases.
+ * Concepts used: Java interfaces, abstraction boundaries, and enterprise service patterns.
+ */

@@ -8,3 +8,8 @@ public interface ClinicRepository extends JpaRepository<Clinic, Long> {
     Optional<Clinic> findByTenantId(String tenantId);
     boolean existsByTenantId(String tenantId);
 }
+
+/*
+ * This file contains the ClinicRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

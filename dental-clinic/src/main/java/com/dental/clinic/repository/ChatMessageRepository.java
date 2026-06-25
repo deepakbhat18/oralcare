@@ -59,3 +59,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
         """)
     List<Long> findContactUserIds(@Param("userId") Long userId);
 }
+
+/*
+ * This file contains the ChatMessageRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

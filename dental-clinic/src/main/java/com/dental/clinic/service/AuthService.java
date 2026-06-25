@@ -34,6 +34,10 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final PatientService patientService;
+    private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final LoginHistoryRepository loginHistoryRepository;
+    private final MetricsService metricsService;
 
     @Value("${app.password-reset.token-expiry-minutes:15}")
     private int tokenExpiryMinutes;
@@ -44,27 +48,83 @@ public class AuthService {
     @Value("${app.registration.otp-expiry-minutes:5}")
     private int registrationOtpExpiryMinutes;
 
-
-
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String ipAddress, String deviceDetails) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> {
+                    loginHistoryRepository.save(LoginHistory.builder()
+                            .username(request.getEmail())
+                            .ipAddress(ipAddress)
+                            .deviceDetails(deviceDetails)
+                            .status(LoginHistory.LoginStatus.FAILED_BAD_CREDENTIALS)
+                            .build());
+                    return new BadRequestException("Invalid email or password");
+                });
+
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            loginHistoryRepository.save(LoginHistory.builder()
+                    .username(request.getEmail())
+                    .ipAddress(ipAddress)
+                    .deviceDetails(deviceDetails)
+                    .status(LoginHistory.LoginStatus.FAILED_LOCKED)
+                    .build());
+            throw new BadRequestException("Account is temporarily locked. Please try again after " + user.getLockedUntil());
+        }
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         } catch (BadCredentialsException e) {
-            throw new BadRequestException("Invalid email or password");
+            int attempts = user.getFailedLoginAttempts() != null ? user.getFailedLoginAttempts() : 0;
+            attempts++;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= 5) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+                user.setFailedLoginAttempts(0);
+                userRepository.save(user);
+                loginHistoryRepository.save(LoginHistory.builder()
+                        .username(request.getEmail())
+                        .ipAddress(ipAddress)
+                        .deviceDetails(deviceDetails)
+                        .status(LoginHistory.LoginStatus.FAILED_LOCKED)
+                        .build());
+                metricsService.incrementAuthFailure("LOCKED");
+                throw new BadRequestException("Account locked due to 5 consecutive failed login attempts. Locked for 15 minutes.");
+            } else {
+                userRepository.save(user);
+                loginHistoryRepository.save(LoginHistory.builder()
+                        .username(request.getEmail())
+                        .ipAddress(ipAddress)
+                        .deviceDetails(deviceDetails)
+                        .status(LoginHistory.LoginStatus.FAILED_BAD_CREDENTIALS)
+                        .build());
+                metricsService.incrementAuthFailure("BAD_CREDENTIALS");
+                throw new BadRequestException("Invalid email or password");
+            }
         }
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User", null));
 
         if (!user.isActive()) {
             throw new BadRequestException("Account is not verified yet. Please check your email for the OTP.");
         }
 
+
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+
+        loginHistoryRepository.save(LoginHistory.builder()
+                .username(request.getEmail())
+                .ipAddress(ipAddress)
+                .deviceDetails(deviceDetails)
+                .status(LoginHistory.LoginStatus.SUCCESS)
+                .build());
+
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-        String accessToken = jwtUtil.generateToken(userDetails);
-        String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+        java.util.Map<String, Object> extraClaims = new java.util.HashMap<>();
+        extraClaims.put("userId", user.getId());
+        extraClaims.put("clinicId", user.getClinicId());
+        String accessToken = jwtUtil.generateToken(extraClaims, userDetails);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), ipAddress, deviceDetails).getToken();
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -75,13 +135,11 @@ public class AuthService {
                 .build();
     }
 
-
     @Transactional
     public UserResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             User existingUser = userRepository.findByEmail(request.getEmail()).orElseThrow();
             if (!existingUser.isEmailVerified()) {
-
                 sendRegistrationOtp(existingUser.getEmail());
                 return mapToUserResponse(existingUser);
             }
@@ -111,7 +169,6 @@ public class AuthService {
         return mapToUserResponse(user);
     }
 
-
     @Transactional
     public void verifyRegistrationOtp(String email, String otp) {
         OtpVerification otpRecord = otpVerificationRepository
@@ -138,7 +195,6 @@ public class AuthService {
         log.info("OTP verified and account activated for: {}", email);
     }
 
-
     @Transactional
     public void verifyEmail(String token) {
         User user = userRepository.findByEmailVerificationToken(token)
@@ -149,7 +205,6 @@ public class AuthService {
         userRepository.save(user);
         log.info("Email verified for user: {}", user.getEmail());
     }
-
 
     @Transactional
     public void requestPasswordReset(PasswordResetRequest request) {
@@ -166,7 +221,6 @@ public class AuthService {
                 saveResetToken(email, token, null, tokenExpiryMinutes, PasswordResetToken.TokenType.EMAIL_LINK);
                 emailService.sendPasswordResetEmail(email, token);
             } else {
-
                 String otp = generateOtp();
                 saveResetToken(email, UUID.randomUUID().toString(), otp,
                         otpExpiryMinutes, PasswordResetToken.TokenType.OTP_EMAIL);
@@ -206,25 +260,46 @@ public class AuthService {
         log.info("Password successfully reset for: {}", user.getEmail());
     }
 
+    @Transactional
+    public AuthResponse refreshToken(String tokenStr, String ipAddress, String deviceDetails) {
+        RefreshToken token = refreshTokenRepository.findByToken(tokenStr)
+                .orElseThrow(() -> new TokenException("Refresh token not found"));
 
-    public AuthResponse refreshToken(String refreshToken) {
-        String email = jwtUtil.extractUsername(refreshToken);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-        if (!jwtUtil.isTokenValid(refreshToken, userDetails)) {
-            throw new BadRequestException("Invalid refresh token");
+        token = refreshTokenService.verifyExpiration(token);
+
+        User user = token.getUser();
+
+
+        if (ipAddress != null && token.getIpAddress() != null && !ipAddress.equals(token.getIpAddress())) {
+            log.warn("Session anomaly detected! Token refresh request from IP: {} does not match original login IP: {} for user: {}",
+                    ipAddress, token.getIpAddress(), user.getEmail());
         }
-        String newAccessToken = jwtUtil.generateToken(userDetails);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", null));
+
+
+        token.setRevoked(true);
+        refreshTokenRepository.save(token);
+
+        String newRefreshToken = refreshTokenService.createRefreshToken(user.getId(), ipAddress, deviceDetails).getToken();
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        java.util.Map<String, Object> extraClaims = new java.util.HashMap<>();
+        extraClaims.put("userId", user.getId());
+        extraClaims.put("clinicId", user.getClinicId());
+        String newAccessToken = jwtUtil.generateToken(extraClaims, userDetails);
+
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(refreshToken)
+                .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtUtil.getExpirationTime())
                 .user(mapToUserResponse(user))
                 .build();
     }
 
+    @Transactional
+    public void logout(Long userId) {
+        refreshTokenService.deleteByUserId(userId);
+    }
 
     private void sendRegistrationOtp(String email) {
         otpVerificationRepository.deleteAllByEmailAndOtpType(email, OtpVerification.OtpType.REGISTRATION);
@@ -268,3 +343,8 @@ public class AuthService {
                 .build();
     }
 }
+
+/*
+ * This file contains the AuthService class which manages abstract contracts for clinical operations and decoupling controllers from repository databases.
+ * Concepts used: Java interfaces, abstraction boundaries, and enterprise service patterns.
+ */

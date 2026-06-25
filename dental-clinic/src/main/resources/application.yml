@@ -3,9 +3,9 @@ spring:
     name: dental-clinic-management
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/dental_clinic
-    username: dental_user
-    password: dental_pass
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dental_clinic}
+    username: ${DB_USER:dental_user}
+    password: ${DB_PASS:dental_pass}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -22,11 +22,15 @@ spring:
         format_sql: true
         use_sql_comments: true
 
+  flyway:
+    enabled: false
+    baseline-on-migrate: true
+
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: deepak.unofficial18@gmail.com
-    password: sjmrlktaytfpfkcc
+    username: ${MAIL_USER:deepak.unofficial18@gmail.com}
+    password: ${MAIL_PASS:sjmrlktaytfpfkcc}
     properties:
       mail:
         smtp:
@@ -44,7 +48,23 @@ spring:
       max-request-size: 10MB
 
   cache:
-    type: simple
+    type: redis
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:google-client-secret}
+            scope:
+              - email
+              - profile
 
 server:
   port: 8080
@@ -54,25 +74,21 @@ server:
     include-message: always
     include-binding-errors: always
 
-# JWT Configuration
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    expiration: 86400000        # 24 hours in ms
-    refresh-expiration: 604800000 # 7 days in ms
+    expiration: 86400000
+    refresh-expiration: 604800000
   password-reset:
     token-expiry-minutes: 15
     otp-expiry-minutes: 10
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./uploads}
-    max-size: 10485760 # 10MB
-  ai:
-    models-dir: ${AI_MODELS_DIR:./ai-models}
-    training-data-dir: ${AI_TRAINING_DIR:./training-data}
+    max-size: 10485760
   notification:
     email-from: ${NOTIFICATION_FROM:noreply@dentalclinic.com}
-
-# Springdoc / Swagger
+  registration:
+    otp-expiry-minutes: 5
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -83,7 +99,6 @@ springdoc:
     display-request-duration: true
   show-actuator: false
 
-# Logging
 logging:
   level:
     com.dental.clinic: DEBUG
@@ -96,4 +111,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true

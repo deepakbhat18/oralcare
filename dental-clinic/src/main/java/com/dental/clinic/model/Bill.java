@@ -7,6 +7,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "bills")
@@ -21,6 +23,10 @@ public class Bill {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Payment> payments = new ArrayList<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
@@ -28,6 +34,10 @@ public class Bill {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "treatment_id")
     private TreatmentPlan treatment;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id")
+    private Clinic clinic;
 
     @Column(nullable = false)
     private Double amount;
@@ -84,4 +94,16 @@ public class Bill {
             this.totalAmount = (amount - disc) + taxAmt;
         }
     }
+
+    public Double getPaidAmount() {
+        if (payments == null) return 0.0;
+        return payments.stream()
+                .mapToDouble(p -> p.isRefund() ? -p.getAmount() : p.getAmount())
+                .sum();
+    }
 }
+
+/*
+ * This file contains the Bill class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

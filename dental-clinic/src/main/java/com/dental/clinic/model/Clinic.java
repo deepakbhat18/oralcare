@@ -59,3 +59,8 @@ public class Clinic {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+
+/*
+ * This file contains the Clinic class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

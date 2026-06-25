@@ -1,4 +1,3 @@
-
 package com.dental.clinic.repository;
 
 import com.dental.clinic.model.Appointment;
@@ -16,8 +15,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByPatientId(Long patientId);
     List<Appointment> findByDentistId(Long dentistId);
     List<Appointment> findByStatus(Appointment.AppointmentStatus status);
+    List<Appointment> findByClinicId(Long clinicId);
     List<Appointment> findByDateTimeBetween(LocalDateTime start, LocalDateTime end);
-//    List<Appointment> findByDentistIdAndDateTimeBetween(Long dentistId, LocalDateTime start, LocalDateTime end);
+
     List<Appointment> findByDentistIdAndDateTimeBetween(Long dentistId,java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     @Query("SELECT a FROM Appointment a WHERE a.dateTime >= :now AND a.status NOT IN ('COMPLETED','CANCELLED','NO_SHOW') ORDER BY a.dateTime")
@@ -37,7 +37,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             @Param("dentistId") Long dentistId,
             @Param("slotDate") LocalDateTime slotDate);
 
-    /** Count appointments in the queue ahead of a given appointment. */
+
     @Query("""
         SELECT COUNT(a) FROM Appointment a
         WHERE a.dentist.id = :dentistId
@@ -88,4 +88,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     int countActiveQueueInWindow(@Param("windowStart") LocalDateTime windowStart,
                                  @Param("windowEnd") LocalDateTime windowEnd);
 
+    long countByStatus(Appointment.AppointmentStatus status);
+
+    @Query("""
+        SELECT a FROM Appointment a
+        WHERE a.status IN ('SCHEDULED', 'CONFIRMED')
+          AND a.reminderSent = false
+          AND a.dateTime >= :start AND a.dateTime <= :end
+        """)
+    List<Appointment> findPendingReminders(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    List<Appointment> findByStatusAndDateTimeBefore(Appointment.AppointmentStatus status, LocalDateTime dateTime);
 }
+
+/*
+ * This file contains the AppointmentRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

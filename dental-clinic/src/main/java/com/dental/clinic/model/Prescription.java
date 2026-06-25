@@ -32,7 +32,11 @@ public class Prescription {
     @JoinColumn(name = "prescribed_by")
     private User prescribedBy;
 
-    @Column(name = "medicine_list", columnDefinition = "TEXT", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id")
+    private Clinic clinic;
+
+    @Column(name = "medicine_list", columnDefinition = "TEXT")
     private String medicineList;
 
     @Column(name = "dosage_instructions", columnDefinition = "TEXT")
@@ -48,7 +52,36 @@ public class Prescription {
     @Builder.Default
     private boolean active = true;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "prescription_items", joinColumns = @JoinColumn(name = "prescription_id"))
+    @Builder.Default
+    private java.util.List<PrescriptionItem> items = new java.util.ArrayList<>();
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    @PreUpdate
+    public void syncMedicineList() {
+        if (items != null && !items.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (PrescriptionItem item : items) {
+                sb.append(item.getMedicineName())
+                  .append(" (").append(item.getDosage())
+                  .append(", ").append(item.getFrequency())
+                  .append(", ").append(item.getDuration()).append(")");
+                if (item.getInstructions() != null && !item.getInstructions().isBlank()) {
+                    sb.append(" - ").append(item.getInstructions());
+                }
+                sb.append("\n");
+            }
+            this.medicineList = sb.toString().trim();
+        }
+    }
 }
+
+/*
+ * This file contains the Prescription class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

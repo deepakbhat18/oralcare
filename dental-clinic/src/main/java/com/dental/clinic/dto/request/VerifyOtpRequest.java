@@ -16,3 +16,8 @@ public class VerifyOtpRequest {
     @Size(min = 6, max = 6, message = "OTP must be exactly 6 digits")
     private String otp;
 }
+
+/*
+ * This file contains the VerifyOtpRequest class which manages generic helper tasks and clinical administration configurations.
+ * Concepts used: Java object-oriented design and clean architecture.
+ */

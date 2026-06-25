@@ -9,3 +9,8 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, Long
     List<Prescription> findByPatientIdAndActive(Long patientId, boolean active);
     List<Prescription> findByPrescribedById(Long doctorId);
 }
+
+/*
+ * This file contains the PrescriptionRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

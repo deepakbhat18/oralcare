@@ -50,3 +50,8 @@ public class OtpVerification {
         REGISTRATION, PASSWORD_RESET
     }
 }
+
+/*
+ * This file contains the OtpVerification class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

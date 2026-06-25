@@ -1,0 +1,1 @@
+-- Database baseline placeholder for existing schema.

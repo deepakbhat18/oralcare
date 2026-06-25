@@ -16,3 +16,8 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     @Query("DELETE FROM PasswordResetToken p WHERE p.expiry < :now")
     void deleteExpiredTokens(LocalDateTime now);
 }
+
+/*
+ * This file contains the PasswordResetTokenRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

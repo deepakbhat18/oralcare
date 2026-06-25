@@ -10,3 +10,8 @@ public interface TreatmentPlanRepository extends JpaRepository<TreatmentPlan, Lo
     List<TreatmentPlan> findByStatus(TreatmentPlan.TreatmentStatus status);
     List<TreatmentPlan> findByPatientIdAndStatus(Long patientId, TreatmentPlan.TreatmentStatus status);
 }
+
+/*
+ * This file contains the TreatmentPlanRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

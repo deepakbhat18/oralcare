@@ -7,5 +7,9 @@ import java.util.List;
 public interface DoctorNoteRepository extends JpaRepository<DoctorNote, Long> {
     List<DoctorNote> findByPatientId(Long patientId);
     List<DoctorNote> findByDoctorId(Long doctorId);
-    List<DoctorNote> findByPatientIdAndSuggestedByAI(Long patientId, boolean suggestedByAI);
 }
+
+/*
+ * This file contains the DoctorNoteRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */

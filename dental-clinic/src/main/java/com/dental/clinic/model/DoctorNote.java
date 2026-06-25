@@ -2,6 +2,8 @@ package com.dental.clinic.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -9,6 +11,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "doctor_notes")
+@SQLDelete(sql = "UPDATE doctor_notes SET deleted = true WHERE id = ?")
+@Where(clause = "deleted = false")
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @NoArgsConstructor
@@ -35,16 +39,6 @@ public class DoctorNote {
     @Column(name = "note_text", nullable = false, columnDefinition = "TEXT")
     private String noteText;
 
-    @Column(name = "suggested_by_ai")
-    @Builder.Default
-    private boolean suggestedByAI = false;
-
-    @Column(name = "ai_confidence_score")
-    private Double aiConfidenceScore;
-
-    @Column(name = "ai_model_used")
-    private String aiModelUsed;
-
     @Column(name = "category")
     private String category;
 
@@ -52,7 +46,16 @@ public class DoctorNote {
     @Builder.Default
     private boolean flagged = false;
 
+    @Builder.Default
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 }
+
+/*
+ * This file contains the DoctorNote class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

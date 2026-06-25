@@ -53,6 +53,13 @@ public class User {
     @Column(name = "clinic_id")
     private Long clinicId;
 
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Notification> notifications = new ArrayList<>();
@@ -69,3 +76,8 @@ public class User {
         ADMIN, DENTIST, RECEPTIONIST, PATIENT
     }
 }
+
+/*
+ * This file contains the User class which manages JPA persistence entities mapping database tables to Java object structures.
+ * Concepts used: JPA/ORM annotations, database schema definitions, and Lombok builders.
+ */

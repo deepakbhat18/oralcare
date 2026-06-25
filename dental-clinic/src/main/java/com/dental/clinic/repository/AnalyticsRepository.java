@@ -47,9 +47,9 @@ public interface AnalyticsRepository extends JpaRepository<Appointment, Long> {
     List<Object[]> dailyCountsInRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("""
-        SELECT AVG(a.predictedQueueTime)
+        SELECT AVG(a.estimatedWaitMinutes)
         FROM Appointment a
-        WHERE a.predictedQueueTime IS NOT NULL
+        WHERE a.estimatedWaitMinutes IS NOT NULL
           AND a.dateTime >= :start AND a.dateTime < :end
         """)
     Double avgQueueTimeInRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
@@ -83,3 +83,8 @@ public interface AnalyticsRepository extends JpaRepository<Appointment, Long> {
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.dentist.id = :dentistId")
     long countTotalByDentist(@Param("dentistId") Long dentistId);
 }
+
+/*
+ * This file contains the AnalyticsRepository class which manages database query execution, abstracting SQL statements, and retrieving raw entity data.
+ * Concepts used: Spring Data repositories, JpaRepository capabilities, and custom database queries.
+ */
