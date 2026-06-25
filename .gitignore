@@ -1,0 +1,11 @@
+# Ignore frontend directory completely as requested
+oralcare-frontend/
+
+# IDE/Editor directories
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
