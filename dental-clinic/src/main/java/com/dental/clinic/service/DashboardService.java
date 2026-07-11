@@ -42,6 +42,8 @@ public class DashboardService {
         long todayApts   = appointmentRepository.countToday(LocalDateTime.now());
         long completed   = appointmentRepository.countCompleted();
         long cancelled   = appointmentRepository.countByStatus(Appointment.AppointmentStatus.CANCELLED);
+        long noShow      = appointmentRepository.countByStatus(Appointment.AppointmentStatus.NO_SHOW);
+        long upcoming    = appointmentRepository.countUpcoming(LocalDateTime.now());
         long documents   = documentRepository.count();
         long unreadNotif = 0L;
         long pendingBill = billRepository.countByStatus(com.dental.clinic.model.Bill.BillStatus.UNPAID);
@@ -52,6 +54,8 @@ public class DashboardService {
                 .totalAppointmentsToday(todayApts)
                 .totalAppointmentsCompleted(completed)
                 .totalAppointmentsCancelled(cancelled)
+                .totalAppointmentsUpcoming(upcoming)
+                .totalAppointmentsNoShow(noShow)
                 .totalDocumentsUploaded(documents)
                 .unreadNotifications(unreadNotif)
                 .pendingBills(pendingBill)

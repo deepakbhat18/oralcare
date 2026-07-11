@@ -213,6 +213,7 @@ public class AnalyticsService {
         long scheduled = appointmentRepository.countByStatus(Appointment.AppointmentStatus.SCHEDULED);
 
         double cancellationRate = total > 0 ? ((double) cancelled / total) * 100 : 0.0;
+        double noShowRate = total > 0 ? ((double) noShow / total) * 100 : 0.0;
 
         stats.put("totalAppointments", total);
         stats.put("completed", completed);
@@ -220,8 +221,97 @@ public class AnalyticsService {
         stats.put("noShow", noShow);
         stats.put("scheduled", scheduled);
         stats.put("cancellationRatePercent", Math.round(cancellationRate * 100.0) / 100.0);
+        stats.put("noShowRatePercent", Math.round(noShowRate * 100.0) / 100.0);
 
         return stats;
+    }
+
+    @Cacheable(value = "analytics", key = "'no_show_stats'")
+    @Transactional(readOnly = true)
+    public Map<String, Object> getNoShowStats() {
+        log.info("Cache MISS - Aggregating no-show stats");
+        Map<String, Object> report = new HashMap<>();
+
+        long totalAppointments = appointmentRepository.count();
+        long totalNoShows = appointmentRepository.countByStatus(Appointment.AppointmentStatus.NO_SHOW);
+        double noShowPercentage = totalAppointments > 0 ? ((double) totalNoShows / totalAppointments) * 100 : 0.0;
+
+        report.put("totalNoShows", totalNoShows);
+        report.put("noShowPercentage", Math.round(noShowPercentage * 100.0) / 100.0);
+
+        // Most Frequently Missed Patients
+        List<Object[]> missedPatientsRaw = appointmentRepository.findMostFrequentlyMissedPatients(org.springframework.data.domain.PageRequest.of(0, 5));
+        List<Map<String, Object>> missedPatients = missedPatientsRaw.stream().map(row -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("patientName", row[0]);
+            m.put("missedCount", row[1]);
+            return m;
+        }).collect(Collectors.toList());
+        report.put("mostFrequentlyMissedPatients", missedPatients);
+
+        // No-Show Rate by Dentist
+        List<Object[]> dentistNoShowsRaw = appointmentRepository.findNoShowCountByDentist();
+        Map<String, Long> noShowCounts = dentistNoShowsRaw.stream().collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> (Long) row[1],
+                (a, b) -> a
+        ));
+
+        List<User> dentists = userRepository.findByRole(User.Role.DENTIST);
+        Map<String, Double> noShowRateByDentist = new HashMap<>();
+        for (User d : dentists) {
+            long totalForDentist = appointmentRepository.findByDentistId(d.getId()).size();
+            long noShowsForDentist = noShowCounts.getOrDefault(d.getName(), 0L);
+            double rate = totalForDentist > 0 ? ((double) noShowsForDentist / totalForDentist) * 100 : 0.0;
+            noShowRateByDentist.put(d.getName(), Math.round(rate * 100.0) / 100.0);
+        }
+        report.put("noShowRateByDentist", noShowRateByDentist);
+
+        // Daily No-Show Trend (last 7 days)
+        List<Map<String, Object>> dailyTrend = new java.util.ArrayList<>();
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.minusDays(6).atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+        List<Object[]> dailyRaw = appointmentRepository.findDailyNoShowsInRange(start, end);
+        
+        Map<String, Long> dailyMap = new HashMap<>();
+        for (Object[] row : dailyRaw) {
+            if (row[0] != null && row[1] != null) {
+                dailyMap.put(row[0].toString(), ((Number) row[1]).longValue());
+            }
+        }
+        
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            Map<String, Object> dayInfo = new HashMap<>();
+            dayInfo.put("day", date.format(java.time.format.DateTimeFormatter.ofPattern("MMM dd")));
+            dayInfo.put("noShows", dailyMap.getOrDefault(date.toString(), 0L));
+            dailyTrend.add(dayInfo);
+        }
+        report.put("dailyNoShowTrend", dailyTrend);
+
+        // Monthly No-Show Trend (last 6 months)
+        List<Map<String, Object>> monthlyTrend = new java.util.ArrayList<>();
+        LocalDateTime sixMonthsAgo = today.minusMonths(5).withDayOfMonth(1).atStartOfDay();
+        List<Object[]> monthlyRaw = appointmentRepository.findMonthlyNoShowsSince(sixMonthsAgo);
+        
+        Map<String, Long> monthlyMap = new HashMap<>();
+        for (Object[] row : monthlyRaw) {
+            if (row[0] != null && row[1] != null) {
+                monthlyMap.put(row[0].toString(), ((Number) row[1]).longValue());
+            }
+        }
+        
+        for (int i = 5; i >= 0; i--) {
+            YearMonth month = YearMonth.from(today.minusMonths(i));
+            Map<String, Object> monthInfo = new HashMap<>();
+            monthInfo.put("month", month.toString());
+            monthInfo.put("noShows", monthlyMap.getOrDefault(month.toString(), 0L));
+            monthlyTrend.add(monthInfo);
+        }
+        report.put("monthlyNoShowTrend", monthlyTrend);
+
+        return report;
     }
 
     @Cacheable(value = "analytics", key = "'revenue_by_treatment'")

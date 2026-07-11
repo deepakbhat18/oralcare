@@ -9,6 +9,8 @@ public class DashboardStatsResponse {
     private long totalAppointmentsToday;
     private long totalAppointmentsCompleted;
     private long totalAppointmentsCancelled;
+    private long totalAppointmentsUpcoming;
+    private long totalAppointmentsNoShow;
     private long totalDocumentsUploaded;
     private long unreadNotifications;
     private long pendingBills;

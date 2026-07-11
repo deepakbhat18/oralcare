@@ -144,6 +144,17 @@ public class AppointmentService {
     public AppointmentResponse updateAppointment(Long id, AppointmentRequest request) {
         Appointment appointment = findById(id);
 
+        Appointment.AppointmentStatus targetStatus = request.getStatus();
+        if (targetStatus != null) {
+            if (appointment.getStatus() == Appointment.AppointmentStatus.NO_SHOW && targetStatus != Appointment.AppointmentStatus.NO_SHOW) {
+                throw new BadRequestException("A NO_SHOW appointment cannot be updated to another status. Please book a new appointment.");
+            }
+            if (targetStatus == Appointment.AppointmentStatus.NO_SHOW 
+                    && appointment.getStatus() != Appointment.AppointmentStatus.SCHEDULED 
+                    && appointment.getStatus() != Appointment.AppointmentStatus.CONFIRMED) {
+                throw new BadRequestException("Only SCHEDULED or CONFIRMED appointments can be marked as NO_SHOW.");
+            }
+        }
 
         int duration = request.getDurationMinutes() != null ? request.getDurationMinutes() : AVG_CONSULTATION_MINUTES;
         dentistScheduleService.validateDentistSchedule(appointment.getDentist().getId(), request.getDateTime(), duration);
@@ -221,6 +232,16 @@ public class AppointmentService {
     @CacheEvict(value = "analytics", allEntries = true)
     public AppointmentResponse updateStatus(Long id, Appointment.AppointmentStatus status) {
         Appointment appointment = findById(id);
+
+        if (appointment.getStatus() == Appointment.AppointmentStatus.NO_SHOW && status != Appointment.AppointmentStatus.NO_SHOW) {
+            throw new BadRequestException("A NO_SHOW appointment cannot be updated to another status. Please book a new appointment.");
+        }
+        if (status == Appointment.AppointmentStatus.NO_SHOW 
+                && appointment.getStatus() != Appointment.AppointmentStatus.SCHEDULED 
+                && appointment.getStatus() != Appointment.AppointmentStatus.CONFIRMED) {
+            throw new BadRequestException("Only SCHEDULED or CONFIRMED appointments can be marked as NO_SHOW.");
+        }
+
         appointment.setStatus(status);
         Appointment saved = appointmentRepository.save(appointment);
 
@@ -247,6 +268,43 @@ public class AppointmentService {
         }
 
         return mapToResponse(saved);
+    }
+
+    public List<AppointmentResponse> getByStatus(Appointment.AppointmentStatus status) {
+        return appointmentRepository.findByStatus(status).stream()
+                .map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    public org.springframework.data.domain.Page<AppointmentResponse> getPaginated(
+            Appointment.AppointmentStatus status, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.domain.Page<Appointment> page = (status != null)
+                ? appointmentRepository.findByStatus(status, pageable)
+                : appointmentRepository.findAll(pageable);
+        return page.map(this::mapToResponse);
+    }
+
+    public org.springframework.data.domain.Page<AppointmentResponse> searchMissedAppointments(
+            String query, org.springframework.data.domain.Pageable pageable) {
+        return appointmentRepository.searchMissedAppointments(query, pageable).map(this::mapToResponse);
+    }
+
+    public long getTotalMissedAppointments() {
+        return appointmentRepository.countByStatus(Appointment.AppointmentStatus.NO_SHOW);
+    }
+
+    public List<AppointmentResponse> getMissedAppointmentsByPatient(Long patientId) {
+        return appointmentRepository.findByPatientIdAndStatus(patientId, Appointment.AppointmentStatus.NO_SHOW).stream()
+                .map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    public List<AppointmentResponse> getMissedAppointmentsByDentist(Long dentistId) {
+        return appointmentRepository.findByDentistIdAndStatus(dentistId, Appointment.AppointmentStatus.NO_SHOW).stream()
+                .map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    public List<AppointmentResponse> getMissedAppointmentsByDateRange(LocalDateTime start, LocalDateTime end) {
+        return appointmentRepository.findByStatusAndDateTimeBetween(Appointment.AppointmentStatus.NO_SHOW, start, end).stream()
+                .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Transactional

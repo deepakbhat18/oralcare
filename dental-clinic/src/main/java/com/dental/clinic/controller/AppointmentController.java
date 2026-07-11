@@ -31,9 +31,61 @@ public class AppointmentController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
-    @Operation(summary = "Get all appointments")
-    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAll() {
+    @Operation(summary = "Get all appointments (optionally filter by status)")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAll(
+            @RequestParam(required = false) Appointment.AppointmentStatus status) {
+        if (status != null) {
+            return ResponseEntity.ok(ApiResponse.success(appointmentService.getByStatus(status)));
+        }
         return ResponseEntity.ok(ApiResponse.success(appointmentService.getAllAppointments()));
+    }
+
+    @GetMapping("/paginated")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get paginated appointments (optionally filter by status)")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AppointmentResponse>>> getPaginated(
+            @RequestParam(required = false) Appointment.AppointmentStatus status,
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getPaginated(status, pageable)));
+    }
+
+    @GetMapping("/missed/search")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Search missed (NO_SHOW) appointments")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AppointmentResponse>>> searchMissed(
+            @RequestParam String query,
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.searchMissedAppointments(query, pageable)));
+    }
+
+    @GetMapping("/missed/count")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get total missed (NO_SHOW) appointments count")
+    public ResponseEntity<ApiResponse<Long>> getMissedCount() {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getTotalMissedAppointments()));
+    }
+
+    @GetMapping("/missed/patient/{patientId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST','PATIENT')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by patient")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByPatient(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByPatient(patientId)));
+    }
+
+    @GetMapping("/missed/dentist/{dentistId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by dentist")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByDentist(@PathVariable Long dentistId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByDentist(dentistId)));
+    }
+
+    @GetMapping("/missed/date-range")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by date range")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByDateRange(start, end)));
     }
 
     @GetMapping("/{id}")

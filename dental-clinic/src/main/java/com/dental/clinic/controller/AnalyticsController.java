@@ -85,6 +85,13 @@ public class AnalyticsController {
         return ResponseEntity.ok(ApiResponse.success(analyticsService.getAppointmentStats()));
     }
 
+    @GetMapping("/no-shows")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get no-show statistics and trends")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getNoShowStats() {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getNoShowStats()));
+    }
+
     @GetMapping("/treatment-distribution-map")
     @PreAuthorize("hasAnyRole('ADMIN','DENTIST')")
     @Operation(summary = "Get count distribution of treatment types across completed appointments (Map)")
