@@ -69,12 +69,55 @@ public class PopulateScenarioTest {
         appointmentRepository.deleteAll();
         treatmentPlanRepository.deleteAll();
 
-        // 2. Fetch default clinic
-        Clinic clinic = clinicRepository.findById(1L)
-                .orElseThrow(() -> new RuntimeException("Default clinic ID=1 not found"));
+        // 2. Fetch or create default clinic
+        Clinic clinic = clinicRepository.findById(1L).orElse(null);
+        if (clinic == null) {
+            clinic = Clinic.builder()
+                    .name("OralCare Premium Clinic")
+                    .address("123 Dental Suite, Medical District")
+                    .contact("555-0199")
+                    .email("premium@oralcare.com")
+                    .licenseNumber("LC-999182")
+                    .tenantId("tenant-12345")
+                    .active(true)
+                    .build();
+            clinic = clinicRepository.save(clinic);
+        }
 
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         String passwordHash = encoder.encode("password123");
+
+        // Create Admin User if not exists
+        User admin = userRepository.findByEmail("admin@oralcare.com").orElse(null);
+        if (admin == null) {
+            admin = User.builder()
+                    .name("Admin User")
+                    .email("admin@oralcare.com")
+                    .password(passwordHash)
+                    .role(User.Role.ADMIN)
+                    .phoneNumber("9876543200")
+                    .active(true)
+                    .emailVerified(true)
+                    .clinicId(clinic.getId())
+                    .build();
+            userRepository.save(admin);
+        }
+
+        // Create Dr. Sarah Dentist if not exists
+        User sarah = userRepository.findByEmail("sarah.dentist@oralcare.com").orElse(null);
+        if (sarah == null) {
+            sarah = User.builder()
+                    .name("Dr. Sarah Dentist")
+                    .email("sarah.dentist@oralcare.com")
+                    .password(passwordHash)
+                    .role(User.Role.DENTIST)
+                    .phoneNumber("9876543201")
+                    .active(true)
+                    .emailVerified(true)
+                    .clinicId(clinic.getId())
+                    .build();
+            sarah = userRepository.save(sarah);
+        }
 
         // 3. Create 100 patients
         System.out.println("Creating 100 scenario patients...");
@@ -115,9 +158,9 @@ public class PopulateScenarioTest {
         // 4. Create 2 extra doctors
         System.out.println("Creating 2 extra dentists...");
         List<User> dentists = new ArrayList<>();
-        
-        // Add existing doctor Dr. Sarah Dentist (ID 2)
-        userRepository.findById(2L).ifPresent(dentists::add);
+
+        // Add existing doctor Dr. Sarah Dentist
+        userRepository.findByEmail("sarah.dentist@oralcare.com").ifPresent(dentists::add);
 
         for (int i = 1; i <= 2; i++) {
             String email = "scenario_dentist_" + i + "@oralcare.com";
@@ -137,7 +180,10 @@ public class PopulateScenarioTest {
             }
             dentists.add(dentist);
 
-            // Add weekly hours/availability (Monday to Friday, 9:00 AM to 5:00 PM) for the new dentist
+        }
+
+        // Add weekly hours/availability (Monday to Friday, 9:00 AM to 5:00 PM) for all dentists
+        for (User dentist : dentists) {
             for (int day = 1; day <= 5; day++) {
                 if (!availabilityRepository.findByDentistIdAndDayOfWeek(dentist.getId(), day).isPresent()) {
                     DentistAvailability availability = DentistAvailability.builder()
@@ -157,16 +203,15 @@ public class PopulateScenarioTest {
         List<AppointmentResponse> bookedAppointments = new ArrayList<>();
 
         // Dates to book across
-        LocalDate dateToday = LocalDate.of(2026, 6, 26); // Today (Friday)
-        LocalDate dateMonday = LocalDate.of(2026, 6, 29); // Monday
-        LocalDate dateTuesday = LocalDate.of(2026, 6, 30); // Tuesday
-        List<LocalDate> bookingDates = List.of(dateToday, dateMonday, dateTuesday);
+        LocalDate dateTomorrow = LocalDate.now().plusDays(1);
+        LocalDate dateDayAfter = LocalDate.now().plusDays(2);
+        LocalDate dateTwoDaysAfter = LocalDate.now().plusDays(3);
+        List<LocalDate> bookingDates = List.of(dateTomorrow, dateDayAfter, dateTwoDaysAfter);
 
         List<String> slotTimes = List.of(
                 "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
                 "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-                "15:00", "15:30", "16:00", "16:30"
-        );
+                "15:00", "15:30", "16:00", "16:30");
 
         int dentistIdx = 0;
         int dateIdx = 0;
@@ -189,7 +234,8 @@ public class PopulateScenarioTest {
                 AppointmentResponse resp = appointmentService.bookAppointment(req);
                 bookedAppointments.add(resp);
             } catch (Exception e) {
-                System.out.println("Booking failed for patient " + patient.getName() + " on " + dateTime + ": " + e.getMessage());
+                System.out.println(
+                        "Booking failed for patient " + patient.getName() + " on " + dateTime + ": " + e.getMessage());
             }
 
             // Move to the next slot configuration:
@@ -213,7 +259,7 @@ public class PopulateScenarioTest {
         Patient p1 = createdPatients.get(0);
         Patient p2 = createdPatients.get(1);
         User targetDoctor = dentists.get(0);
-        LocalDateTime conflictTime = LocalDateTime.of(LocalDate.of(2026, 7, 1), LocalTime.of(10, 0));
+        LocalDateTime conflictTime = LocalDateTime.of(LocalDate.now().plusDays(4), LocalTime.of(10, 0));
 
         // Create first booking (should succeed)
         AppointmentRequest req1 = new AppointmentRequest();
@@ -261,7 +307,8 @@ public class PopulateScenarioTest {
             planReq.setDentistId(dentists.get(i % dentists.size()).getId());
             planReq.setPlanName("Scenario Root Canal Plan " + (i + 1));
             planReq.setDescription("Treatment plan for Root Canal therapy including scaling and crown installation.");
-            planReq.setSessions(List.of("Evaluation & X-Ray", "Cleaning & Prep", "Root Canal Extraction", "Temporary Filling", "Crown Placement"));
+            planReq.setSessions(List.of("Evaluation & X-Ray", "Cleaning & Prep", "Root Canal Extraction",
+                    "Temporary Filling", "Crown Placement"));
             planReq.setEstimatedCost(1500.00);
             planReq.setStartDate(LocalDateTime.now());
             planReq.setEndDate(LocalDateTime.now().plusWeeks(3));
@@ -276,13 +323,19 @@ public class PopulateScenarioTest {
 }
 
 /*
- * Created an integration test to auto-populate the database with 100 patient accounts, 2 extra dentists, and weekly calendars.
- * The test simulates a real clinic setup by booking appointments across three days, creating consultation bills for each patient,
- * setting up 5-session root canal treatment plans for 10 patients, and validating double-booking rejections.
- * Concepts: Integration testing in Spring Boot, automated data seeding, business rule validation, and transaction flow testing.
+ * Created an integration test to auto-populate the database with 100 patient
+ * accounts, 2 extra dentists, and weekly calendars.
+ * The test simulates a real clinic setup by booking appointments across three
+ * days, creating consultation bills for each patient,
+ * setting up 5-session root canal treatment plans for 10 patients, and
+ * validating double-booking rejections.
+ * Concepts: Integration testing in Spring Boot, automated data seeding,
+ * business rule validation, and transaction flow testing.
  */
 
 /*
- * This file contains the PopulateScenarioTest class which manages verifying application features, service operations, and database integration workflows.
- * Concepts used: Spring Boot integration tests, JUnit assertions, and mock MVC actions.
+ * This file contains the PopulateScenarioTest class which manages verifying
+ * application features, service operations, and database integration workflows.
+ * Concepts used: Spring Boot integration tests, JUnit assertions, and mock MVC
+ * actions.
  */

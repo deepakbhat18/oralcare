@@ -7,6 +7,8 @@ import com.dental.clinic.model.*;
 import com.dental.clinic.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,24 +26,72 @@ public class PatientService {
     private final ClinicRepository clinicRepository;
     private final UserRepository userRepository;
 
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) throw new BadRequestException("Not authenticated");
+        return userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
     public List<PatientResponse> getAllPatients() {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getRole() == User.Role.DENTIST) {
+                return patientRepository.findByDentistId(currentUser.getId()).stream()
+                        .map(this::mapToResponse).collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to retrieve authenticated user, returning all patients: {}", e.getMessage());
+        }
         return patientRepository.findAll().stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public PatientResponse getPatientById(Long id) {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getRole() == User.Role.DENTIST) {
+                boolean isAssociated = patientRepository.isPatientAssociatedWithDentist(id, currentUser.getId());
+                if (!isAssociated) {
+                    throw new BadRequestException("Access denied: you can only view your own patients");
+                }
+            }
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Failed to verify dentist access for patient ID {}: {}", id, e.getMessage());
+        }
         return mapToResponse(findById(id));
     }
 
     public List<PatientResponse> getPatientsByClinic(Long clinicId) {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getRole() == User.Role.DENTIST) {
+                return patientRepository.findPatientsByClinicAndDentist(clinicId, currentUser.getId()).stream()
+                        .map(this::mapToResponse).collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to retrieve authenticated user for clinic list: {}", e.getMessage());
+        }
         return patientRepository.findByClinicId(clinicId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public List<PatientResponse> searchPatients(String name) {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser.getRole() == User.Role.DENTIST) {
+                return patientRepository.searchPatientsByDentist(name, currentUser.getId()).stream()
+                        .map(this::mapToResponse).collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to retrieve authenticated user for patient search: {}", e.getMessage());
+        }
         return patientRepository.findByNameContainingIgnoreCase(name).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
+
 
     @Transactional
     public PatientResponse createPatient(PatientRequest request) {

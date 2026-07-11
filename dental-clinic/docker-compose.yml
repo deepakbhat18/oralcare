@@ -9,11 +9,11 @@ services:
       POSTGRES_USER: dental_user
       POSTGRES_PASSWORD: dental_pass
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dental_user -d dental_clinic"]
+      test: [ "CMD-SHELL", "pg_isready -U dental_user -d dental_clinic" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +26,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
