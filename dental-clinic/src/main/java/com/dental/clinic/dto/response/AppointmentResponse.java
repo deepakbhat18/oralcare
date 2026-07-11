@@ -9,6 +9,7 @@ public class AppointmentResponse {
     private Long id;
     private Long patientId;
     private String patientName;
+    private Long patientUserId;
     private Long dentistId;
     private String dentistName;
     private String treatmentType;

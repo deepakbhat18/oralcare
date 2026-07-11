@@ -347,6 +347,7 @@ public class AppointmentService {
                 .id(a.getId())
                 .patientId(a.getPatient().getId())
                 .patientName(a.getPatient().getName())
+                .patientUserId(a.getPatient().getUser() != null ? a.getPatient().getUser().getId() : null)
                 .patientEmail(a.getPatient().getEmail())
                 .patientContact(a.getPatient().getContact())
                 .dentistId(a.getDentist().getId())
