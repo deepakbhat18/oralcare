@@ -65,6 +65,15 @@ public class Appointment {
     @JoinColumn(name = "clinic_id")
     private Clinic clinic;
 
+    @Column(name = "check_in_time")
+    private LocalDateTime checkInTime;
+
+    @Column(name = "treatment_start_time")
+    private LocalDateTime treatmentStartTime;
+
+    @Column(name = "treatment_end_time")
+    private LocalDateTime treatmentEndTime;
+
     @Builder.Default
     @Column(name = "reminder_sent", nullable = false)
     private boolean reminderSent = false;
@@ -78,6 +87,10 @@ public class Appointment {
     private boolean reminder1hSent = false;
 
     @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "appointment_type", nullable = false)
+    private AppointmentType appointmentType = AppointmentType.SCHEDULED;
+
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
 
@@ -92,6 +105,10 @@ public class Appointment {
     public enum AppointmentStatus {
         SCHEDULED, CONFIRMED, WAITING, IN_PROGRESS, COMPLETED,
         CANCELLED, NO_SHOW, RESCHEDULED
+    }
+
+    public enum AppointmentType {
+        SCHEDULED, WALK_IN, EMERGENCY
     }
 }
 

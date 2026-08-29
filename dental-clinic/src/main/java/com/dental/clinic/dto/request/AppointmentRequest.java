@@ -10,6 +10,7 @@ public class AppointmentRequest {
     @NotBlank private String treatmentType;
     @NotNull private LocalDateTime dateTime;
     private Appointment.AppointmentStatus status;
+    private Appointment.AppointmentType appointmentType;
     private String notes;
     private Integer durationMinutes;
     private String roomNumber;

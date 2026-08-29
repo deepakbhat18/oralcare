@@ -14,6 +14,7 @@ public class BillResponse {
     private Long patientId;
     private String patientName;
     private Long treatmentId;
+    private Long appointmentId;
     private Double amount;
     private Double discount;
     private Double tax;

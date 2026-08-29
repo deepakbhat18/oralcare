@@ -26,6 +26,7 @@ public class BillService {
     private final PatientRepository patientRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
     private final NotificationService notificationService;
+    private final AppointmentRepository appointmentRepository;
 
     public List<BillResponse> getAllBills() {
         return billRepository.findAll().stream().map(this::mapToResponse).collect(Collectors.toList());
@@ -66,6 +67,11 @@ public class BillService {
         if (request.getTreatmentId() != null) {
             treatmentPlanRepository.findById(request.getTreatmentId())
                     .ifPresent(builder::treatment);
+        }
+
+        if (request.getAppointmentId() != null) {
+            appointmentRepository.findById(request.getAppointmentId())
+                    .ifPresent(builder::appointment);
         }
 
         Bill bill = billRepository.save(builder.build());
@@ -191,6 +197,7 @@ public class BillService {
                 .patientId(b.getPatient().getId())
                 .patientName(b.getPatient().getName())
                 .treatmentId(b.getTreatment() != null ? b.getTreatment().getId() : null)
+                .appointmentId(b.getAppointment() != null ? b.getAppointment().getId() : null)
                 .amount(b.getAmount())
                 .discount(b.getDiscount())
                 .tax(b.getTax())

@@ -15,6 +15,7 @@ public class AppointmentResponse {
     private String treatmentType;
     private LocalDateTime dateTime;
     private Appointment.AppointmentStatus status;
+    private Appointment.AppointmentType appointmentType;
     private String notes;
     private Integer durationMinutes;
     private String roomNumber;

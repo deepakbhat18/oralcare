@@ -35,8 +35,10 @@ public class AppointmentService {
     private final NotificationService notificationService;
     private final DentistScheduleService dentistScheduleService;
     private final MetricsService metricsService;
+    private final com.dental.clinic.scheduler.AppointmentScheduler appointmentScheduler;
 
     public List<AppointmentResponse> getAllAppointments() {
+        appointmentScheduler.processNoShows();
         return appointmentRepository.findAll().stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
@@ -46,16 +48,19 @@ public class AppointmentService {
     }
 
     public List<AppointmentResponse> getByPatient(Long patientId) {
+        appointmentScheduler.processNoShows();
         return appointmentRepository.findByPatientId(patientId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public List<AppointmentResponse> getByDentist(Long dentistId) {
+        appointmentScheduler.processNoShows();
         return appointmentRepository.findByDentistId(dentistId).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public List<AppointmentResponse> getUpcoming() {
+        appointmentScheduler.processNoShows();
         return appointmentRepository.findUpcomingAppointments(LocalDateTime.now()).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
@@ -66,6 +71,7 @@ public class AppointmentService {
     }
 
     public List<AppointmentResponse> getLiveQueue(Long dentistId) {
+        appointmentScheduler.processNoShows();
         return appointmentRepository.findLiveQueue(dentistId, LocalDateTime.now()).stream()
                 .map(this::mapToResponse).collect(Collectors.toList());
     }
@@ -89,6 +95,23 @@ public class AppointmentService {
         }
 
 
+        // RBAC Enforcement: WALK_IN appointments can ONLY be created by RECEPTIONIST or ADMIN
+        boolean isWalkInRequest = (request.getAppointmentType() == Appointment.AppointmentType.WALK_IN)
+                || (request.getNotes() != null && request.getNotes().toUpperCase().contains("WALK_IN"))
+                || (request.getStatus() == Appointment.AppointmentStatus.WAITING);
+
+        if (isWalkInRequest) {
+            org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !auth.getAuthorities().isEmpty()) {
+                boolean isReceptionistOrAdmin = auth.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_RECEPTIONIST") || a.getAuthority().equals("ROLE_ADMIN"));
+                if (!isReceptionistOrAdmin) {
+                    throw new org.springframework.security.access.AccessDeniedException("WALK_IN appointments can ONLY be created by a RECEPTIONIST.");
+                }
+            }
+        }
+
         int duration = request.getDurationMinutes() != null ? request.getDurationMinutes() : AVG_CONSULTATION_MINUTES;
         dentistScheduleService.validateDentistSchedule(dentist.getId(), request.getDateTime(), duration);
 
@@ -96,6 +119,9 @@ public class AppointmentService {
         validateSlotOverlap(dentist.getId(), request.getDateTime(), duration, null);
 
         LocalDateTime bookingTime = LocalDateTime.now();
+        Appointment.AppointmentType type = request.getAppointmentType() != null 
+                ? request.getAppointmentType() 
+                : (isWalkInRequest ? Appointment.AppointmentType.WALK_IN : Appointment.AppointmentType.SCHEDULED);
 
         Appointment appointment = Appointment.builder()
                 .patient(patient)
@@ -103,6 +129,7 @@ public class AppointmentService {
                 .treatmentType(request.getTreatmentType())
                 .dateTime(request.getDateTime())
                 .status(request.getStatus() != null ? request.getStatus() : Appointment.AppointmentStatus.SCHEDULED)
+                .appointmentType(type)
                 .notes(request.getNotes())
                 .durationMinutes(duration)
                 .roomNumber(request.getRoomNumber())
@@ -242,6 +269,14 @@ public class AppointmentService {
             throw new BadRequestException("Only SCHEDULED or CONFIRMED appointments can be marked as NO_SHOW.");
         }
 
+        if (status == Appointment.AppointmentStatus.WAITING) {
+            appointment.setCheckInTime(LocalDateTime.now());
+        } else if (status == Appointment.AppointmentStatus.IN_PROGRESS) {
+            appointment.setTreatmentStartTime(LocalDateTime.now());
+        } else if (status == Appointment.AppointmentStatus.COMPLETED) {
+            appointment.setTreatmentEndTime(LocalDateTime.now());
+        }
+
         appointment.setStatus(status);
         Appointment saved = appointmentRepository.save(appointment);
 
@@ -249,6 +284,7 @@ public class AppointmentService {
             BillRequest autoB = new BillRequest();
 
             autoB.setPatientId(appointment.getPatient().getId());
+            autoB.setAppointmentId(appointment.getId()); // LINK THE APPOINTMENT!
 
             double estimatedAmount = appointment.getDurationMinutes() != null
                     ? appointment.getDurationMinutes() * 10.0
@@ -318,20 +354,28 @@ public class AppointmentService {
     }
 
     private void recalculateQueue(Long dentistId, LocalDateTime dateTime) {
+        if (dateTime != null && dateTime.toLocalDate().isBefore(java.time.LocalDate.now())) {
+            return;
+        }
         List<Appointment> queue = appointmentRepository.findQueueForDentistOnDate(dentistId, dateTime);
         int cumulativeWait = 0;
 
         for (int i = 0; i < queue.size(); i++) {
             Appointment apt = queue.get(i);
 
-            apt.setQueuePosition(i + 1);
-            apt.setEstimatedWaitMinutes(cumulativeWait);
-
-            int slotDuration = (apt.getDurationMinutes() != null)
-                    ? apt.getDurationMinutes()
-                    : AVG_CONSULTATION_MINUTES;
-
-            cumulativeWait += slotDuration;
+            if (apt.getDateTime() != null && apt.getDateTime().isBefore(LocalDateTime.now()) && 
+                (apt.getStatus() == Appointment.AppointmentStatus.SCHEDULED || apt.getStatus() == Appointment.AppointmentStatus.CONFIRMED)) {
+                apt.setStatus(Appointment.AppointmentStatus.NO_SHOW);
+                apt.setQueuePosition(null);
+                apt.setEstimatedWaitMinutes(null);
+            } else {
+                apt.setQueuePosition(i + 1);
+                apt.setEstimatedWaitMinutes(cumulativeWait);
+                int slotDuration = (apt.getDurationMinutes() != null)
+                        ? apt.getDurationMinutes()
+                        : AVG_CONSULTATION_MINUTES;
+                cumulativeWait += slotDuration;
+            }
 
             appointmentRepository.save(apt);
         }
@@ -343,6 +387,14 @@ public class AppointmentService {
     }
 
     public AppointmentResponse mapToResponse(Appointment a) {
+        boolean isPast = a.getDateTime() != null && a.getDateTime().isBefore(LocalDateTime.now());
+        boolean isInactiveStatus = a.getStatus() == Appointment.AppointmentStatus.COMPLETED
+                || a.getStatus() == Appointment.AppointmentStatus.CANCELLED
+                || a.getStatus() == Appointment.AppointmentStatus.NO_SHOW;
+
+        Integer queuePos = (isPast || isInactiveStatus) ? null : a.getQueuePosition();
+        Integer estWait = (isPast || isInactiveStatus) ? null : a.getEstimatedWaitMinutes();
+
         return AppointmentResponse.builder()
                 .id(a.getId())
                 .patientId(a.getPatient().getId())
@@ -355,12 +407,13 @@ public class AppointmentService {
                 .treatmentType(a.getTreatmentType())
                 .dateTime(a.getDateTime())
                 .status(a.getStatus())
+                .appointmentType(a.getAppointmentType())
                 .notes(a.getNotes())
                 .durationMinutes(a.getDurationMinutes())
                 .roomNumber(a.getRoomNumber())
                 .bookingTime(a.getBookingTime())
-                .queuePosition(a.getQueuePosition())
-                .estimatedWaitMinutes(a.getEstimatedWaitMinutes())
+                .queuePosition(queuePos)
+                .estimatedWaitMinutes(estWait)
                 .createdAt(a.getCreatedAt())
                 .build();
     }

@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -105,6 +106,95 @@ public class AnalyticsController {
     public ResponseEntity<ApiResponse<Void>> clearCache() {
         analyticsService.evictAnalyticsCache();
         return ResponseEntity.ok(ApiResponse.success("Analytics cache cleared successfully", null));
+    }
+
+    @GetMapping("/dashboard-summary")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get unified practice analytics dashboard summary")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboardSummary(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getDashboardSummary(dentistId, clinicId, startDate, endDate)));
+    }
+
+    @GetMapping("/wait-time")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get detailed wait time analytics and trends")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getWaitTimeAnalytics(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getWaitTimeAnalytics(dentistId, clinicId, startDate, endDate)));
+    }
+
+    @GetMapping("/treatments")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST')")
+    @Operation(summary = "Get treatment distribution and revenue analytics")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getTreatmentAnalytics(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getTreatmentAnalytics(dentistId, clinicId, startDate, endDate)));
+    }
+
+    @GetMapping("/appointments-smart")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get advanced appointment booking and growth trends")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAppointmentAnalytics(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getAppointmentAnalytics(dentistId, clinicId, startDate, endDate)));
+    }
+
+    @GetMapping("/patients")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get patient demographic and behavioral analytics")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPatientAnalytics(
+            @RequestParam(required = false) Long clinicId) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getPatientAnalytics(clinicId)));
+    }
+
+    @GetMapping("/dentists-smart")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
+    @Operation(summary = "Get detailed productivity and wait time reports per dentist")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getDentistPerformance(
+            @RequestParam(required = false) Long clinicId) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getDentistPerformance(clinicId)));
+    }
+
+    @GetMapping("/financials")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST')")
+    @Operation(summary = "Get financial performance and billing analytics")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getFinancialAnalytics(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getFinancialAnalytics(dentistId, clinicId, startDate, endDate)));
+    }
+
+    @GetMapping("/queue")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get current queue metrics and utilization analytics")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getQueueAnalytics(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getQueueAnalytics(dentistId, clinicId)));
+    }
+
+    @GetMapping("/business-insights")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get structured smart business insights for decision-making")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getSmartBusinessInsights(
+            @RequestParam(required = false) Long dentistId,
+            @RequestParam(required = false) Long clinicId) {
+        return ResponseEntity.ok(ApiResponse.success(analyticsService.getSmartBusinessInsights(dentistId, clinicId)));
     }
 }
 

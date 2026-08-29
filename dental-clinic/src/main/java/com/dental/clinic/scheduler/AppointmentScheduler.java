@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -27,7 +30,8 @@ public class AppointmentScheduler {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
 
-    @Scheduled(cron = "0 */15 * * * *") // Runs every 15 minutes
+    @EventListener(ApplicationReadyEvent.class)
+    @Scheduled(cron = "0 */5 * * * *") // Runs on app startup and every 5 minutes
     @Transactional
     public void processNoShows() {
         log.info("Executing appointment no-show detection scheduler...");
@@ -64,8 +68,10 @@ public class AppointmentScheduler {
             log.info("Marking appointment #{} for patient {} as NO_SHOW (scheduled time was {})",
                     apt.getId(), apt.getPatient().getName(), apt.getDateTime());
 
-            // Update status to NO_SHOW
+            // Update status to NO_SHOW and clear queue info
             apt.setStatus(Appointment.AppointmentStatus.NO_SHOW);
+            apt.setQueuePosition(null);
+            apt.setEstimatedWaitMinutes(null);
             appointmentRepository.save(apt);
 
             // Audit log for appointment status update

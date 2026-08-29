@@ -152,6 +152,19 @@ public class AppointmentController {
                 .body(ApiResponse.success("Appointment booked successfully", appointmentService.bookAppointment(request)));
     }
 
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
+    @Operation(summary = "Book a walk-in appointment (RECEPTIONIST ONLY)",
+            description = "Creates a WALK_IN appointment and adds patient to active queue. Only accessible by RECEPTIONIST or ADMIN.")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> bookWalkIn(@Valid @RequestBody AppointmentRequest request) {
+        request.setAppointmentType(Appointment.AppointmentType.WALK_IN);
+        if (request.getStatus() == null) {
+            request.setStatus(Appointment.AppointmentStatus.WAITING);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Walk-in appointment created successfully", appointmentService.bookAppointment(request)));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST','DENTIST')")
     @Operation(summary = "Update appointment details")

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class BillRequest {
     @NotNull private Long patientId;
     private Long treatmentId;
+    private Long appointmentId;
     @NotNull @Positive private Double amount;
     private Double discount;
     private Double tax;
