@@ -78,6 +78,7 @@ public class BillingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    @org.springframework.transaction.annotation.Transactional
     void testRecordPayment_Success() throws Exception {
         PaymentRequest request = PaymentRequest.builder()
                 .amount(500.0)
@@ -87,7 +88,7 @@ public class BillingIntegrationTest extends BaseIntegrationTest {
                 .refund(false)
                 .build();
 
-        mockMvc.perform(post("/api/v1/bills/" + testBill.getId() + "/payments")
+        mockMvc.perform(post("/bills/" + testBill.getId() + "/payments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

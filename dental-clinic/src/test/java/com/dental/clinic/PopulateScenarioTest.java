@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @SpringBootTest
-public class PopulateScenarioTest {
+public class PopulateScenarioTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;

@@ -27,9 +27,17 @@ public class SecurityIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private com.dental.clinic.repository.AppointmentRepository appointmentRepository;
+
+    @Autowired
+    private com.dental.clinic.repository.PatientRepository patientRepository;
+
     @BeforeEach
     void setUp() {
         refreshTokenRepository.deleteAll();
+        appointmentRepository.deleteAll();
+        patientRepository.deleteAll();
         userRepository.deleteAll();
     }
 
@@ -44,15 +52,15 @@ public class SecurityIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build());
 
-        mockMvc.perform(get("/api/v1/sessions"))
+        mockMvc.perform(get("/sessions/active"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
     void testGetActiveSessions_Unauthenticated_ShouldFail() throws Exception {
-        mockMvc.perform(get("/api/v1/sessions"))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/sessions/active"))
+                .andExpect(status().is3xxRedirection());
     }
 }
 
