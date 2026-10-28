@@ -231,8 +231,16 @@ public class AppointmentService {
     }
 
     public List<String> getAvailableSlots(Long dentistId, java.time.LocalDate date) {
-        java.time.LocalDateTime dayStart = date.atTime(9, 0);
-        java.time.LocalDateTime dayEnd = date.atTime(17, 0);
+        java.util.Optional<com.dental.clinic.model.DentistAvailability> availOpt =
+                dentistScheduleService.getAvailabilityForDate(dentistId, date);
+
+        if (availOpt.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        com.dental.clinic.model.DentistAvailability availability = availOpt.get();
+        java.time.LocalDateTime dayStart = date.atTime(availability.getStartTime());
+        java.time.LocalDateTime dayEnd = date.atTime(availability.getEndTime());
 
         List<java.time.LocalDateTime> booked = appointmentRepository
                 .findByDentistIdAndDateTimeBetween(dentistId, dayStart, dayEnd)
@@ -244,7 +252,7 @@ public class AppointmentService {
 
         List<String> slots = new java.util.ArrayList<>();
         java.time.LocalDateTime cursor = dayStart;
-        while (cursor.isBefore(dayEnd)) {
+        while (cursor.plusMinutes(AVG_CONSULTATION_MINUTES).isBefore(dayEnd) || cursor.plusMinutes(AVG_CONSULTATION_MINUTES).isEqual(dayEnd)) {
             final java.time.LocalDateTime slot = cursor;
             if (booked.stream().noneMatch(b -> b.equals(slot))) {
                 slots.add(slot.toLocalTime().toString());

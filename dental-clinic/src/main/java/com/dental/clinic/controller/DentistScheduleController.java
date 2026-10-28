@@ -50,6 +50,14 @@ public class DentistScheduleController {
         return ResponseEntity.ok(ApiResponse.success(dentistScheduleService.getAvailabilities(dentistId)));
     }
 
+    @DeleteMapping("/availability/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST')")
+    @Operation(summary = "Delete an availability schedule slot")
+    public ResponseEntity<ApiResponse<Void>> deleteAvailability(@PathVariable Long id) {
+        dentistScheduleService.deleteAvailability(id);
+        return ResponseEntity.ok(ApiResponse.success("Availability removed successfully", null));
+    }
+
     @PostMapping("/leaves")
     @PreAuthorize("hasAnyRole('ADMIN','DENTIST')")
     @Operation(summary = "Request a leave (dentist)")

@@ -121,6 +121,16 @@ public class DentistScheduleService {
 
 
 
+    public java.util.Optional<DentistAvailability> getAvailabilityForDate(Long dentistId, LocalDate date) {
+        List<DentistLeave> overlappingLeaves = leaveRepository.findApprovedLeaveOnDate(dentistId, date);
+        if (!overlappingLeaves.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+
+        int dayOfWeek = date.getDayOfWeek().getValue();
+        return availabilityRepository.findByDentistIdAndDayOfWeek(dentistId, dayOfWeek);
+    }
+
     public void validateDentistSchedule(Long dentistId, LocalDateTime dateTime, int durationMinutes) {
         LocalDate date = dateTime.toLocalDate();
         LocalTime time = dateTime.toLocalTime();

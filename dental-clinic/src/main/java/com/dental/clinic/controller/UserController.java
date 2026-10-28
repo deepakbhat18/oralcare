@@ -59,6 +59,7 @@ public class UserController {
     @Operation(summary = "Get all dentists")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getDentists() {
         List<UserResponse> dentists = userRepository.findByRole(User.Role.DENTIST).stream()
+                .filter(User::isActive)
                 .map(authService::mapToUserResponse).collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.success(dentists));
     }
