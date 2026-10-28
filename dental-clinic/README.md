@@ -12,44 +12,6 @@ An enterprise-grade, multi-tenant clinical healthcare backend built with **Sprin
 
 ---
 
-## 📋 Table of Contents
-
-- [1. Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
-- [2. System Architecture & Request Lifecycle](#2-system-architecture--request-lifecycle)
-- [3. Technology Stack & Design Decisions](#3-technology-stack--design-decisions)
-- [4. Core Modules & Business Logic](#4-core-modules--business-logic)
-  - [4.1 Authentication, Identity & Session Management](#41-authentication-identity--session-management)
-  - [4.2 Appointment Lifecycle & FCFS Queue Engine](#42-appointment-lifecycle--fcfs-queue-engine)
-  - [4.3 Doctor Availability & Consultation Window Enforcement](#43-doctor-availability--consultation-window-enforcement)
-  - [4.4 Automated No-Show Detection & Background Schedulers](#44-automated-no-show-detection--background-schedulers)
-  - [4.5 Walk-in Triage Workflow & Receptionist RBAC](#45-walk-in-triage-workflow--receptionist-rbac)
-  - [4.6 Odontogram & Digital Dental Charting](#46-odontogram--digital-dental-charting)
-  - [4.7 Multi-Tier Billing, Invoicing & Payments](#47-multi-tier-billing-invoicing--payments)
-  - [4.8 Enterprise AOP Audit Trail](#48-enterprise-aop-audit-trail)
-  - [4.9 Document Management & Clinical Reports](#49-document-management--clinical-reports)
-  - [4.10 Unified Patient Clinical Timeline](#410-unified-patient-clinical-timeline)
-- [5. Database Architecture & Persistence Strategy](#5-database-architecture--persistence-strategy)
-- [6. End-to-End Application Workflows](#6-end-to-end-application-workflows)
-  - [6.1 Scheduled Patient Booking & Dynamic Slot Validation](#61-scheduled-patient-booking--dynamic-slot-validation)
-  - [6.2 Receptionist Walk-in Triage & FCFS Priority Queue](#62-receptionist-walk-in-triage--fcfs-priority-queue)
-  - [6.3 Clinical Consultation, FDI Odontogram & Prescriptions](#63-clinical-consultation-fdi-odontogram--prescriptions)
-  - [6.4 Multi-Tier Billing, Partial Payments & Invoicing](#64-multi-tier-billing-partial-payments--invoicing)
-  - [6.5 Automated No-Show Detection & Background Cleanup](#65-automated-no-show-detection--background-cleanup)
-- [7. Complete REST API Reference](#7-complete-rest-api-reference)
-- [8. Security Architecture](#8-security-architecture)
-- [9. Performance & Caching Strategy](#9-performance--caching-strategy)
-- [10. External Integrations & Scheduled Jobs](#10-external-integrations--scheduled-jobs)
-- [11. Configuration & Environment Variables](#11-configuration--environment-variables)
-- [12. Local Setup, Docker & CI/CD Deployment](#12-local-setup-docker--cicd-deployment)
-  - [12.1 Running via Docker Compose](#121-running-via-docker-compose-recommended)
-  - [12.2 Running Bare-Metal / Local Development](#122-running-bare-metal--local-development)
-  - [12.3 GitHub Actions CI/CD Pipeline & Automated Delivery](#123-github-actions-cicd-pipeline--automated-delivery)
-- [13. Testing Strategy & Testcontainers Verification](#13-testing-strategy--testcontainers-verification)
-- [14. Error Handling, Reliability & Health Probes](#14-error-handling-reliability--health-probes)
-- [15. Known Limitations & Roadmap](#15-known-limitations--roadmap)
-- [16. License](#16-license)
-
----
 
 ## 1. Executive Summary & Problem Statement
 
