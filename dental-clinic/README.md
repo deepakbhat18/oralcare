@@ -30,12 +30,20 @@ An enterprise-grade, multi-tenant clinical healthcare backend built with **Sprin
   - [4.10 Unified Patient Clinical Timeline](#410-unified-patient-clinical-timeline)
 - [5. Database Architecture & Persistence Strategy](#5-database-architecture--persistence-strategy)
 - [6. End-to-End Application Workflows](#6-end-to-end-application-workflows)
+  - [6.1 Scheduled Patient Booking & Dynamic Slot Validation](#61-scheduled-patient-booking--dynamic-slot-validation)
+  - [6.2 Receptionist Walk-in Triage & FCFS Priority Queue](#62-receptionist-walk-in-triage--fcfs-priority-queue)
+  - [6.3 Clinical Consultation, FDI Odontogram & Prescriptions](#63-clinical-consultation-fdi-odontogram--prescriptions)
+  - [6.4 Multi-Tier Billing, Partial Payments & Invoicing](#64-multi-tier-billing-partial-payments--invoicing)
+  - [6.5 Automated No-Show Detection & Background Cleanup](#65-automated-no-show-detection--background-cleanup)
 - [7. Complete REST API Reference](#7-complete-rest-api-reference)
 - [8. Security Architecture](#8-security-architecture)
 - [9. Performance & Caching Strategy](#9-performance--caching-strategy)
 - [10. External Integrations & Scheduled Jobs](#10-external-integrations--scheduled-jobs)
 - [11. Configuration & Environment Variables](#11-configuration--environment-variables)
-- [12. Local Setup & Docker Deployment](#12-local-setup--docker-deployment)
+- [12. Local Setup, Docker & CI/CD Deployment](#12-local-setup-docker--cicd-deployment)
+  - [12.1 Running via Docker Compose](#121-running-via-docker-compose-recommended)
+  - [12.2 Running Bare-Metal / Local Development](#122-running-bare-metal--local-development)
+  - [12.3 GitHub Actions CI/CD Pipeline & Automated Delivery](#123-github-actions-cicd-pipeline--automated-delivery)
 - [13. Testing Strategy & Testcontainers Verification](#13-testing-strategy--testcontainers-verification)
 - [14. Error Handling, Reliability & Health Probes](#14-error-handling-reliability--health-probes)
 - [15. Known Limitations & Roadmap](#15-known-limitations--roadmap)
@@ -313,7 +321,9 @@ To prevent table scans under concurrent multi-tenant loads:
 
 ## 6. End-to-End Application Workflows
 
-### 6.1 Patient Booking to Treatment Completion
+### 6.1 Scheduled Patient Booking & Dynamic Slot Validation
+
+This workflow ensures zero double-booking and validates patient booking requests strictly against doctor working hours and leave intervals.
 
 ```mermaid
 sequenceDiagram
@@ -340,11 +350,188 @@ sequenceDiagram
     Frontend->>API: POST /api/appointments/book (AppointmentRequest)
     API->>Svc: bookAppointment(request)
     Svc->>Sched: validateDentistSchedule(3, 10:30, 30min)
-    Svc->>DB: Save Appointment (Status=SCHEDULED)
+    Svc->>DB: Save Appointment (Status=SCHEDULED, Type=SCHEDULED)
     Svc->>Svc: recalculateQueue(3, 2026-10-30)
     Svc->>Mail: Send booking confirmation email
     Svc-->>Frontend: Return AppointmentResponse (QueuePos=#3, EstWait=60min)
 ```
+
+1. **Slot Inspection:** Client invokes `GET /api/appointments/available-slots`. `DentistScheduleService` resolves active shifts (`09:00-17:00`) and subtracts scheduled leaves. If off-duty, an empty array `[]` is returned immediately.
+2. **Conflict Checking:** Upon `POST /api/appointments/book`, `AppointmentService` performs `@Transactional` validation ensuring no simultaneous appointment exists and the requested time falls within configured working hours.
+3. **Queue Ingestion:** The appointment is assigned status `SCHEDULED` and `appointment_type = SCHEDULED`. The dynamic queue engine recalculates queue positions for all active patients of that doctor for that calendar day.
+4. **Notification:** An asynchronous confirmation email is triggered via `EmailService`.
+
+---
+
+### 6.2 Receptionist Walk-in Triage & FCFS Priority Queue
+
+For unscheduled patients arriving directly at the clinic front desk, this workflow bypasses standard pre-booking while preserving queue fairness and slot integrity.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor WalkIn as Walk-in Patient
+    actor Receptionist
+    participant Front as Reception Portal
+    participant API as AppointmentController
+    participant Svc as AppointmentService
+    participant Queue as QueueService
+    participant DB as PostgreSQL
+
+    WalkIn->>Receptionist: Arrives at clinic with acute toothache
+    Receptionist->>Front: Enter Patient Details & Assign Doctor
+    Front->>API: POST /api/appointments/walk-in (WalkInRequest)
+    Note over API: @PreAuthorize hasAnyRole('RECEPTIONIST', 'ADMIN')
+    API->>Svc: createWalkInAppointment(request)
+    Svc->>DB: Find or create Patient entity
+    Svc->>DB: Persist Appointment (Status=SCHEDULED, Type=WALK_IN, BookingTime=NOW)
+    Svc->>Queue: recalculateQueuePositions(dentistId, today)
+    Queue->>DB: Fetch all active appointments sorted by FCFS algorithm
+    Queue->>Queue: Compute wait: (position - 1) * 30 min
+    Queue->>DB: Bulk update queue positions & wait times
+    Svc-->>Front: Return WalkInResponse (Token #W-104, Position #4, EstWait 90min)
+    Receptionist-->>WalkIn: Issues Token & directs to Waiting Room
+```
+
+1. **Authorization Guard:** Endpoint `POST /api/appointments/walk-in` strictly requires `ROLE_RECEPTIONIST` or `ROLE_ADMIN`.
+2. **Entity Creation:** The service locates an existing patient by phone/email or creates a new `Patient` profile on the fly.
+3. **Queue Sorting:** Walk-in appointments receive `appointment_type = WALK_IN` and `booking_time = Instant.now()`.
+4. **FCFS Rebalance:** `QueueService` re-computes order using the formula:
+   $$\text{Estimated Wait Time} = (\text{Queue Position} - 1) \times 30 \text{ minutes}$$
+5. **Live Queue Board:** The patient is issued an instant token and appears on the waiting room monitor.
+
+---
+
+### 6.3 Clinical Consultation, FDI Odontogram & Prescriptions
+
+This workflow guides the dentist through physical examination, digital tooth charting, diagnosis, and medication issuance.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dentist
+    participant EHR as Clinical EHR View
+    participant AptAPI as AppointmentController
+    participant OdontoAPI as ToothRecordController
+    participant RxAPI as PrescriptionController
+    participant NotesAPI as DoctorNoteController
+    participant DB as PostgreSQL
+
+    Dentist->>EHR: Click "Start Consultation"
+    EHR->>AptAPI: PATCH /api/appointments/{id}/status?status=IN_PROGRESS
+    AptAPI->>DB: Update Appointment Status to IN_PROGRESS
+    
+    Dentist->>EHR: Open Digital Odontogram (FDI 2-Digit)
+    EHR->>OdontoAPI: GET /api/tooth-records/patient/{patientId}
+    DB-->>OdontoAPI: Return historical tooth records
+    OdontoAPI-->>EHR: Render tooth 11-48 & 51-85 status
+    
+    Dentist->>EHR: Mark Tooth #46: Cavity on Occlusal surface
+    EHR->>OdontoAPI: POST /api/tooth-records
+    OdontoAPI->>DB: Save ToothRecord (Tooth 46, CARIES, OCCLUSAL, RESTORATION)
+    
+    Dentist->>EHR: Prescribe Amoxicillin 500mg & Ibuprofen
+    EHR->>RxAPI: POST /api/prescriptions
+    RxAPI->>DB: Save Prescription entity linked to Appointment
+    
+    Dentist->>EHR: Enter clinical notes & advice
+    EHR->>NotesAPI: POST /api/doctor-notes
+    NotesAPI->>DB: Save DoctorNote
+    
+    Dentist->>EHR: Click "Complete Treatment"
+    EHR->>AptAPI: PATCH /api/appointments/{id}/status?status=COMPLETED
+    AptAPI->>DB: Update Status to COMPLETED
+```
+
+1. **Status Transition:** The doctor changes appointment status to `IN_PROGRESS`, locking the slot on the waiting room board.
+2. **Odontogram Inspection:** The digital dental chart visualizes FDI 2-digit numbered adult teeth (11–48) and pediatric teeth (51–85).
+3. **Surface-Level Diagnosis:** Doctor records specific surface defects (`OCCLUSAL`, `MESIAL`, `DISTAL`, `BUCCAL`, `LINGUAL`) and treatment recommendations (`CROWN`, `FILLING`, `EXTRACTION`, `ROOT_CANAL`).
+4. **Clinical Documentation:** Electronic prescriptions (`Prescription`) and physician diagnosis entries (`DoctorNote`) are immutably tied to the appointment and patient history.
+5. **Session Wrap-up:** Appointment transitions to `COMPLETED`, signaling the billing desk.
+
+---
+
+### 6.4 Multi-Tier Billing, Partial Payments & Invoicing
+
+Handles multi-stage dental financial lifecycles, enabling itemized charging, partial down-payments, ledger reconciliations, and dynamic PDF invoice generation.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Receptionist
+    actor Patient
+    participant BillAPI as BillController
+    participant BillSvc as BillService
+    participant PdfSvc as PdfInvoiceService
+    participant DB as PostgreSQL
+
+    Receptionist->>BillAPI: POST /api/bills (AppointmentId, Items: [Consultation: $50, Filling: $120], Tax: 10%)
+    BillSvc->>BillSvc: Compute Subtotal ($170), Tax ($17), Total ($187)
+    BillSvc->>DB: Save Bill (Total=$187, Paid=$0, Balance=$187, Status=UNPAID)
+    BillAPI-->>Receptionist: Return Created Bill #INV-2026-089
+    
+    Patient->>Receptionist: Pays partial deposit of $100 via Credit Card
+    Receptionist->>BillAPI: POST /api/bills/{id}/payments (Amount: $100, Method: CARD)
+    BillSvc->>DB: Create Payment entity linked to Bill
+    BillSvc->>BillSvc: Recompute: Paid=$100, BalanceDue=$87
+    BillSvc->>DB: Update Bill Status -> PARTIALLY_PAID
+    BillAPI-->>Receptionist: Payment Recorded (Remaining Balance: $87)
+    
+    Patient->>Receptionist: Settles remaining $87 in Cash
+    Receptionist->>BillAPI: POST /api/bills/{id}/payments (Amount: $87, Method: CASH)
+    BillSvc->>DB: Create Payment entity
+    BillSvc->>DB: Update Bill Status -> PAID (BalanceDue=$0)
+    
+    Receptionist->>BillAPI: GET /api/bills/{id}/pdf
+    BillAPI->>PdfSvc: generateInvoicePdf(billId)
+    PdfSvc->>DB: Fetch Clinic details, Patient, Bill Items, and Payments
+    PdfSvc->>PdfSvc: Render OpenPDF document with itemized table & PAID stamp
+    PdfSvc-->>Receptionist: Stream application/pdf byte stream
+```
+
+1. **Invoice Generation:** `BillService` calculates itemized totals, clinic tax percentages, and balance due, initializing status as `UNPAID`.
+2. **Partial Payments:** `POST /api/bills/{id}/payments` allows incremental deposits (common for multi-visit treatments like orthodontics or implants). Balance due is decremented atomically; if balance reaches 0, status transitions to `PAID`, otherwise `PARTIALLY_PAID`.
+3. **OpenPDF Streaming:** `GET /api/bills/{id}/pdf` produces a branded vector PDF receipt detailing line items, payment audit timestamps, tax calculations, and payment status stamps without requiring external PDF rendering engines.
+
+---
+
+### 6.5 Automated No-Show Detection & Background Cleanup
+
+Autonomous background cron schedulers prevent queue stalling and maintain database hygiene without manual administrative intervention.
+
+```mermaid
+flowchart TD
+    Cron1["AppointmentScheduler<br/>Cron: 0 */5 * * * * (Every 5 mins)"]
+    FindMissed["Query DB: Status == SCHEDULED<br/>AND dateTime < (NOW - 15 minutes)"]
+    HasMissed{"Missed Appointments<br/>Found?"}
+    MarkNoShow["Batch Update Status -> NO_SHOW"]
+    AOPLog["Trigger AOP Audit Log<br/>Event: APPOINTMENT_NO_SHOW"]
+    ReQueue["Invoke QueueService.recalculateQueue()<br/>Advance waiting patients forward"]
+    Notify["Dispatch Reschedule Email<br/>to Patient"]
+    Done1["Idle until next cycle"]
+
+    Cron2["ClinicScheduler<br/>Cron: 0 0 2 * * * (Daily at 2 AM)"]
+    PurgeTokens["Purge expired PasswordResetTokens<br/>& Stale RefreshTokens from DB"]
+    OverdueCheck["Scan Bills: Status != PAID<br/>AND dueDate < Today -> Mark OVERDUE"]
+    Done2["Idle until next night"]
+
+    Cron1 --> FindMissed
+    FindMissed --> HasMissed
+    HasMissed -- Yes --> MarkNoShow
+    MarkNoShow --> AOPLog
+    AOPLog --> ReQueue
+    ReQueue --> Notify
+    Notify --> Done1
+    HasMissed -- No --> Done1
+
+    Cron2 --> PurgeTokens
+    PurgeTokens --> OverdueCheck
+    OverdueCheck --> Done2
+```
+
+1. **5-Minute No-Show Detection:** `AppointmentScheduler` inspects all pending appointments. If a patient is more than 15 minutes late without checking in, the appointment transitions to `NO_SHOW`.
+2. **Queue Shaving:** When an appointment is flagged as `NO_SHOW`, `recalculateQueue()` is triggered immediately, shaving estimated wait times for downstream waiting patients and opening the slot for immediate walk-ins.
+3. **Overdue Invoicing & Session Housekeeping:** `ClinicScheduler` sweeps overdue bills every morning and purges stale database tokens every night at 02:00 AM.
 
 ---
 
@@ -547,7 +734,7 @@ All configuration keys in `src/main/resources/application.yml` can be overridden
 
 ---
 
-## 12. Local Setup & Docker Deployment
+## 12. Local Setup, Docker & CI/CD Deployment
 
 ### Prerequisites
 - **Docker & Docker Compose** (Recommended for full-stack deployment)
@@ -606,6 +793,61 @@ The backend includes a multi-stage Docker build and orchestration config in `doc
 
 4. **Access Swagger UI:**
    Open your browser to `http://localhost:8080/api/swagger-ui/index.html`.
+
+---
+
+### 12.3 GitHub Actions CI/CD Pipeline & Automated Delivery
+
+The repository includes a production-grade CI/CD pipeline defined in [`.github/workflows/ci-cd.yml`](file:///.github/workflows/ci-cd.yml) providing continuous integration, automated Testcontainers validation, multi-arch Docker image packaging, and container registry publishing.
+
+```mermaid
+flowchart TD
+    Trigger["Push / Pull Request<br/>(Branches: main, develop)"]
+    
+    subgraph Job1["Job: build-and-test (ubuntu-latest)"]
+        Checkout1[Checkout code actions/checkout@v4]
+        JDK17[Set up JDK 17 temurin with Maven cache]
+        Compile[mvn clean compile]
+        Testcontainers[mvn test<br/>Runs JUnit 5 + Testcontainers PostgreSQL 15]
+    end
+
+    subgraph Job2["Job: docker-build (Trigger: main or develop)"]
+        Checkout2[Checkout code]
+        Buildx[Set up Docker Buildx & QEMU]
+        GHCRLogin[Log in to GitHub Container Registry ghcr.io]
+        DockerBuild[Build & Push Docker Image<br/>Context: ./dental-clinic]
+        Tag1["Tag: ghcr.io/oralcare-backend:latest"]
+        Tag2["Tag: ghcr.io/oralcare-backend:${GITHUB_SHA}"]
+    end
+
+    subgraph Job3["Job: deploy-staging (Trigger: develop branch)"]
+        DeployStep[Trigger Staging Deployment Webhook / Container Restart]
+    end
+
+    Trigger --> Checkout1
+    Checkout1 --> JDK17
+    JDK17 --> Compile
+    Compile --> Testcontainers
+    Testcontainers -->|Pass| Checkout2
+    Checkout2 --> Buildx
+    Buildx --> GHCRLogin
+    GHCRLogin --> DockerBuild
+    DockerBuild --> Tag1
+    DockerBuild --> Tag2
+    DockerBuild -->|Branch == develop| DeployStep
+```
+
+#### Pipeline Stages & Quality Gates
+
+| Stage | Trigger Branch | Responsibilities & Tooling | Failure Behavior |
+|---|---|---|---|
+| **`build-and-test`** | `main`, `develop` (Push & PR) | Compiles Java 17 bytecode, validates Maven dependencies, and runs full unit & integration tests using ephemeral **PostgreSQL 15 Testcontainers**. | Pipeline halts immediately; merges blocked. |
+| **`docker-build`** | `main`, `develop` (Push only) | Initializes QEMU and Docker Buildx; builds multi-stage production Docker image; tags with commit SHA and `:latest`; pushes to **GitHub Container Registry (`ghcr.io`)**. | Image is not published; deployment blocked. |
+| **`deploy-staging`** | `develop` (Push only) | Triggers automated rollout of the newly tagged GHCR container to the staging test environment. | Alerts team via GitHub Actions log notification. |
+
+#### Security & Secrets Management
+- The workflow leverages GitHub's built-in OIDC and `${{ secrets.GITHUB_TOKEN }}` to authenticate against `ghcr.io` without requiring external personal access tokens.
+- Ephemeral test containers isolate database tests so that no external database secrets or host configurations are exposed during CI.
 
 ---
 
