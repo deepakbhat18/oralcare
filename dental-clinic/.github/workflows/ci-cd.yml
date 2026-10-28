@@ -21,14 +21,10 @@ jobs:
           cache: maven
 
       - name: Compile Application
-        run: |
-          cd dental-clinic
-          mvn clean compile
+        run: mvn clean compile
 
       - name: Run JUnit and Testcontainers Tests
-        run: |
-          cd dental-clinic
-          mvn test
+        run: mvn test
 
   docker-build:
     needs: build-and-test
@@ -54,8 +50,8 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
-          context: ./dental-clinic
-          file: ./dental-clinic/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/oralcare-backend:latest
