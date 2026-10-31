@@ -1,0 +1,68 @@
+# ==============================================================================
+# SECRETS & ENVIRONMENT FILES (NEVER COMMIT)
+# ==============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.crt
+*.keystore
+
+# Local Spring Boot configurations containing environment-specific secrets
+application-local.yml
+application-local.properties
+application-dev.yml
+application-dev.properties
+application-prod.yml
+application-prod.properties
+application-secrets.yml
+application-secrets.properties
+
+# ==============================================================================
+# BUILD & COMPILED ARTIFACTS
+# ==============================================================================
+target/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+
+# ==============================================================================
+# LOGS & TEMPORARY FILES
+# ==============================================================================
+*.log
+logs/
+*.tmp
+*.swp
+*~
+
+# ==============================================================================
+# OS & IDE METADATA
+# ==============================================================================
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+*.ipr
+*.iws
+
+# ==============================================================================
+# USER UPLOADS, DATA VOLUMES & CACHE
+# ==============================================================================
+uploads/
+ai-models/
+*.model
+*.ser
+postgres_data/
+redis_data/
+*.db
+*.sqlite
+*.sqlite3

@@ -1,0 +1,198 @@
+package com.dental.clinic.controller;
+
+import com.dental.clinic.dto.request.AppointmentRequest;
+import com.dental.clinic.dto.response.ApiResponse;
+import com.dental.clinic.dto.response.AppointmentResponse;
+import com.dental.clinic.model.Appointment;
+import com.dental.clinic.service.AppointmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@RestController
+@RequestMapping("/appointments")
+@RequiredArgsConstructor
+@Tag(name = "Appointments", description = "FCFS-based appointment booking and queue management")
+@SecurityRequirement(name = "bearerAuth")
+public class AppointmentController {
+
+    private final AppointmentService appointmentService;
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get all appointments (optionally filter by status)")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getAll(
+            @RequestParam(required = false) Appointment.AppointmentStatus status) {
+        if (status != null) {
+            return ResponseEntity.ok(ApiResponse.success(appointmentService.getByStatus(status)));
+        }
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getAllAppointments()));
+    }
+
+    @GetMapping("/paginated")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get paginated appointments (optionally filter by status)")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AppointmentResponse>>> getPaginated(
+            @RequestParam(required = false) Appointment.AppointmentStatus status,
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getPaginated(status, pageable)));
+    }
+
+    @GetMapping("/missed/search")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Search missed (NO_SHOW) appointments")
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<AppointmentResponse>>> searchMissed(
+            @RequestParam String query,
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.searchMissedAppointments(query, pageable)));
+    }
+
+    @GetMapping("/missed/count")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get total missed (NO_SHOW) appointments count")
+    public ResponseEntity<ApiResponse<Long>> getMissedCount() {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getTotalMissedAppointments()));
+    }
+
+    @GetMapping("/missed/patient/{patientId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST','PATIENT')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by patient")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByPatient(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByPatient(patientId)));
+    }
+
+    @GetMapping("/missed/dentist/{dentistId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by dentist")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByDentist(@PathVariable Long dentistId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByDentist(dentistId)));
+    }
+
+    @GetMapping("/missed/date-range")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get missed (NO_SHOW) appointments by date range")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getMissedByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getMissedAppointmentsByDateRange(start, end)));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST','PATIENT')")
+    @Operation(summary = "Get appointment by ID")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getById(id)));
+    }
+
+    @GetMapping("/patient/{patientId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST','PATIENT')")
+    @Operation(summary = "Get appointments by patient — includes queuePosition and estimatedWaitMinutes")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getByPatient(@PathVariable Long patientId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getByPatient(patientId)));
+    }
+
+    @GetMapping("/dentist/{dentistId}")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get appointments by dentist")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getByDentist(@PathVariable Long dentistId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getByDentist(dentistId)));
+    }
+
+    @GetMapping("/dentist/{dentistId}/queue")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get live FCFS queue for a dentist today",
+            description = "Returns WAITING/IN_PROGRESS/SCHEDULED appointments sorted by queuePosition. " +
+                    "Use this endpoint for the receptionist queue management screen.")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getLiveQueue(@PathVariable Long dentistId) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getLiveQueue(dentistId)));
+    }
+    @GetMapping("/available-slots")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST','PATIENT')")
+    @Operation(summary = "Get available 30-min slots for a dentist on a given date")
+    public ResponseEntity<ApiResponse<List<String>>> getAvailableSlots(
+            @RequestParam Long dentistId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getAvailableSlots(dentistId, date)));
+    }
+
+    @GetMapping("/upcoming")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get upcoming appointments")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getUpcoming() {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getUpcoming()));
+    }
+
+    @GetMapping("/date-range")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Get appointments by date range")
+    public ResponseEntity<ApiResponse<List<AppointmentResponse>>> getByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        return ResponseEntity.ok(ApiResponse.success(appointmentService.getByDateRange(start, end)));
+    }
+
+    @PostMapping("/book")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST','PATIENT','DENTIST')")
+    @Operation(summary = "Book appointment (FCFS)",
+            description = "Books the appointment, assigns a FCFS queue position, and returns estimatedWaitMinutes. " +
+                    "Multiple patients CAN book the same slot — they are served FCFS by bookingTime.")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> book(@Valid @RequestBody AppointmentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Appointment booked successfully", appointmentService.bookAppointment(request)));
+    }
+
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
+    @Operation(summary = "Book a walk-in appointment (RECEPTIONIST ONLY)",
+            description = "Creates a WALK_IN appointment and adds patient to active queue. Only accessible by RECEPTIONIST or ADMIN.")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> bookWalkIn(@Valid @RequestBody AppointmentRequest request) {
+        request.setAppointmentType(Appointment.AppointmentType.WALK_IN);
+        if (request.getStatus() == null) {
+            request.setStatus(Appointment.AppointmentStatus.WAITING);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Walk-in appointment created successfully", appointmentService.bookAppointment(request)));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST','DENTIST')")
+    @Operation(summary = "Update appointment details")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> update(
+            @PathVariable Long id, @Valid @RequestBody AppointmentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Appointment updated", appointmentService.updateAppointment(id, request)));
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','DENTIST','RECEPTIONIST')")
+    @Operation(summary = "Update appointment status",
+            description = "WAITING → IN_PROGRESS → COMPLETED. Queue positions recalculate on COMPLETED/CANCELLED.")
+    public ResponseEntity<ApiResponse<AppointmentResponse>> updateStatus(
+            @PathVariable Long id,
+            @RequestParam Appointment.AppointmentStatus status) {
+        return ResponseEntity.ok(ApiResponse.success("Status updated", appointmentService.updateStatus(id, status)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
+    @Operation(summary = "Delete appointment — queue recalculates automatically")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        appointmentService.deleteAppointment(id);
+        return ResponseEntity.ok(ApiResponse.success("Appointment deleted", null));
+    }
+}
+
+/*
+ * This file contains the AppointmentController class which manages HTTP request routing, mapping endpoints, and returning REST API responses.
+ * Concepts used: Spring REST controllers, request mapping annotations, and client-server data exchange.
+ */

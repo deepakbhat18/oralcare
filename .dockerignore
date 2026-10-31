@@ -1,0 +1,29 @@
+# Git
+.git/
+.gitignore
+
+# Environment & Secret files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# Build artifacts & source control cache
+target/
+*.class
+
+# IDE & OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# User data & logs
+uploads/
+ai-models/
+logs/
+*.log
